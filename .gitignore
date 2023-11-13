@@ -1,0 +1,12 @@
+/target
+Cargo.lock
+*~
+*#*#*
+.references/
+temp/
+*.obj
+*.bak
+.gdb_history
+peda-session*.*
+.testing/
+.dir-locals.el
