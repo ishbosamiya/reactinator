@@ -18,7 +18,7 @@ async fn main() {
         token,
         GatewayIntents::non_privileged() | GatewayIntents::GUILD_MESSAGE_REACTIONS,
     )
-    .event_handler(Handler)
+    .event_handler(Handler::new())
     .await
     .expect("Couldn't create client");
 
