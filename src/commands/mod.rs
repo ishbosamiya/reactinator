@@ -1,5 +1,6 @@
 //! Commands.
 
+pub mod add_reaction;
 pub mod ping;
 
 use serenity::{

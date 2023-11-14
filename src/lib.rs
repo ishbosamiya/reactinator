@@ -107,21 +107,37 @@ impl EventHandler for Handler {
         tracing::info!("{} connected", ready.user.name);
 
         for guild_id in ctx.cache.guilds().into_iter() {
-            let mut guild_commands = HashMap::new();
+            let mut guild_commands = self.guild_commands.write().await;
             let commands = guild_id
                 .set_application_commands(&ctx.http, |commands| {
-                    commands.create_application_command(|create_application_command| {
-                        let command = commands::ping::Ping::register(create_application_command);
-                        let commands = guild_commands
-                            .entry(guild_id)
-                            .or_insert_with(GuildCommands::default);
-                        commands.insert(&create_application_command, command);
+                    let guild_commands = guild_commands
+                        .entry(guild_id)
+                        .or_insert_with(GuildCommands::default);
+
+                    fn register_command<'a, C: Command>(
+                        create_application_command: &'a mut CreateApplicationCommand,
+                        guild_commands: &mut GuildCommands,
+                    ) -> &'a mut CreateApplicationCommand {
+                        let command = C::register(create_application_command);
+                        guild_commands.insert(&create_application_command, command);
                         create_application_command
-                    })
+                    }
+
+                    commands
+                        .create_application_command(|create_application_command| {
+                            register_command::<commands::ping::Ping>(
+                                create_application_command,
+                                guild_commands,
+                            )
+                        })
+                        .create_application_command(|create_application_command| {
+                            register_command::<commands::add_reaction::AddReaction>(
+                                create_application_command,
+                                guild_commands,
+                            )
+                        })
                 })
                 .await;
-
-            self.guild_commands.write().await.extend(guild_commands);
 
             match commands {
                 Ok(commands) => {
