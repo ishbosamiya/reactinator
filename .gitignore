@@ -10,3 +10,4 @@ temp/
 peda-session*.*
 .testing/
 .dir-locals.el
+/discord.token
