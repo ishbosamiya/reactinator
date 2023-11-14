@@ -1,5 +1,7 @@
 //! Reactinator - Helper bot to react with any emoji.
 
+pub mod commands;
+
 use serenity::{async_trait, model::prelude::*, prelude::*};
 
 /// Event handler.
@@ -12,6 +14,7 @@ impl EventHandler for Handler {
             tracing::info!("command interaction: {:#?}", command);
 
             let content = match command.data.name.as_str() {
+                "ping" => commands::ping::run(&command.data.options),
                 _ => Some("unimplemented_command".to_string()),
             };
 
@@ -35,7 +38,9 @@ impl EventHandler for Handler {
 
         for guild_id in ctx.cache.guilds().iter() {
             let commands = guild_id
-                .set_application_commands(&ctx.http, |commands| commands)
+                .set_application_commands(&ctx.http, |commands| {
+                    commands.create_application_command(commands::ping::register)
+                })
                 .await;
 
             match commands {

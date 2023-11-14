@@ -1,0 +1,3 @@
+//! Commands.
+
+pub mod ping;
