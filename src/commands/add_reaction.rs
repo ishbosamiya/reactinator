@@ -28,13 +28,13 @@ impl Command for AddReaction {
     fn register(command: &mut CreateApplicationCommand, _bot_context: &BotContext) -> Self {
         command
             .name("add_reaction")
-            .description("Add a reaction to the given message or previous message.")
+            .description("Add reaction(s) to the given message or last message on the channel.")
             .create_option(|command_option| {
                 command_option
                     .required(true)
                     .kind(CommandOptionType::String)
                     .name(OPTION_EMOJI_NAME)
-                    .description("Emoji's name.")
+                    .description("Emojis' name. Can use multiple space separated emojis.")
             })
             .create_option(|command_option| {
                 command_option
@@ -53,14 +53,14 @@ impl Command for AddReaction {
     ) {
         let mut add_reaction_err = None;
 
-        let emoji_name =
+        let emoji_names =
             match command_interaction.data.options.iter().find_map(|option| {
                 (option.name == OPTION_EMOJI_NAME).then_some(option.value.as_ref())
             }) {
-                Some(Some(emoji_name)) => match emoji_name.as_str() {
-                    Some(emoji_name) => Some(emoji_name),
+                Some(Some(emoji_names)) => match emoji_names.as_str() {
+                    Some(emoji_names) => Some(emoji_names),
                     None => {
-                        add_reaction_err = Some(Error::EmojiNameMustBeString(emoji_name.clone()));
+                        add_reaction_err = Some(Error::EmojiNameMustBeString(emoji_names.clone()));
                         None
                     }
                 },
@@ -101,19 +101,25 @@ impl Command for AddReaction {
                 .map(|message_id| message_id.0),
         };
 
-        if let Some(emoji_name) = emoji_name {
+        if let Some(emoji_names) = emoji_names {
             match message_id {
                 Some(message_id) => {
-                    if let Err(err) = context
-                        .http
-                        .create_reaction(
-                            command_interaction.channel_id.0,
-                            message_id,
-                            &ReactionType::Unicode(emoji_name.to_string()),
-                        )
-                        .await
+                    for emoji_name in emoji_names
+                        .split_whitespace()
+                        .map(|emoji_name| emoji_name.trim())
+                        .filter(|emoji_name| !emoji_name.is_empty())
                     {
-                        add_reaction_err = Some(Error::CouldNotReactToMessage(err));
+                        if let Err(err) = context
+                            .http
+                            .create_reaction(
+                                command_interaction.channel_id.0,
+                                message_id,
+                                &ReactionType::Unicode(emoji_name.to_string()),
+                            )
+                            .await
+                        {
+                            add_reaction_err = Some(Error::CouldNotReactToMessage(err));
+                        }
                     }
                 }
                 None => {
@@ -140,7 +146,7 @@ impl Command for AddReaction {
                             } else {
                                 format!(
                                     "added `{}` reaction to `{}`",
-                                    emoji_name.unwrap(),
+                                    emoji_names.unwrap(),
                                     message_id.unwrap()
                                 )
                             })
