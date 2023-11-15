@@ -6,7 +6,10 @@ use serenity::{
     json::Value,
     model::{
         application::interaction::InteractionResponseType,
-        prelude::{command::CommandOptionType, ReactionType},
+        prelude::{
+            application_command::ApplicationCommandInteraction, command::CommandOptionType,
+            ReactionType,
+        },
     },
 };
 
@@ -17,8 +20,8 @@ use super::Command;
 /// `add_reaction` command.
 pub struct AddReaction;
 
-/// Option `emoji_name`.
-const OPTION_EMOJI_NAME: &str = "emoji_name";
+/// Option `emoji`.
+const OPTION_EMOJI: &str = "emoji";
 
 /// Option `message_id`.
 const OPTION_MESSAGE_ID: &str = "message_id";
@@ -33,42 +36,44 @@ impl Command for AddReaction {
                 command_option
                     .required(true)
                     .kind(CommandOptionType::String)
-                    .name(OPTION_EMOJI_NAME)
-                    .description("Emojis' name. Can use multiple space separated emojis.")
+                    .name(OPTION_EMOJI)
+                    .description("Emoji to react with. Can use multiple space separated emojis.")
             })
             .create_option(|command_option| {
                 command_option
                     .kind(CommandOptionType::String)
                     .name(OPTION_MESSAGE_ID)
-                    .description("Message ID to react to.")
+                    .description("Message ID to react to. Defaults to last message on channel.")
             });
         Self
     }
 
     async fn interaction(
         &mut self,
-        command_interaction: &serenity::model::prelude::application_command::ApplicationCommandInteraction,
+        command_interaction: &ApplicationCommandInteraction,
         context: &serenity::prelude::Context,
         bot_context: &BotContext,
     ) {
         let mut add_reaction_err = None;
 
-        let emoji_names =
-            match command_interaction.data.options.iter().find_map(|option| {
-                (option.name == OPTION_EMOJI_NAME).then_some(option.value.as_ref())
-            }) {
-                Some(Some(emoji_names)) => match emoji_names.as_str() {
-                    Some(emoji_names) => Some(emoji_names),
-                    None => {
-                        add_reaction_err = Some(Error::EmojiNameMustBeString(emoji_names.clone()));
-                        None
-                    }
-                },
-                _ => {
-                    add_reaction_err = Some(Error::RequiresEmojiName);
+        let emojis = match command_interaction
+            .data
+            .options
+            .iter()
+            .find_map(|option| (option.name == OPTION_EMOJI).then_some(option.value.as_ref()))
+        {
+            Some(Some(emojis)) => match emojis.as_str() {
+                Some(emojis) => Some(emojis),
+                None => {
+                    add_reaction_err = Some(Error::EmojiNameMustBeString(emojis.clone()));
                     None
                 }
-            };
+            },
+            _ => {
+                add_reaction_err = Some(Error::RequiresEmojiName);
+                None
+            }
+        };
 
         let message_id =
             match command_interaction.data.options.iter().find_map(|option| {
@@ -101,20 +106,20 @@ impl Command for AddReaction {
                 .map(|message_id| message_id.0),
         };
 
-        if let Some(emoji_names) = emoji_names {
+        if let Some(emojis) = emojis {
             match message_id {
                 Some(message_id) => {
-                    for emoji_name in emoji_names
+                    for emoji in emojis
                         .split_whitespace()
-                        .map(|emoji_name| emoji_name.trim())
-                        .filter(|emoji_name| !emoji_name.is_empty())
+                        .map(|emoji| emoji.trim())
+                        .filter(|emoji| !emoji.is_empty())
                     {
                         if let Err(err) = context
                             .http
                             .create_reaction(
                                 command_interaction.channel_id.0,
                                 message_id,
-                                &ReactionType::Unicode(emoji_name.to_string()),
+                                &ReactionType::Unicode(emoji.to_string()),
                             )
                             .await
                         {
@@ -146,7 +151,7 @@ impl Command for AddReaction {
                             } else {
                                 format!(
                                     "added `{}` reaction to `{}`",
-                                    emoji_names.unwrap(),
+                                    emojis.unwrap(),
                                     message_id.unwrap()
                                 )
                             })
