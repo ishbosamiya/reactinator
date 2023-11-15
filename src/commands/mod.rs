@@ -1,6 +1,7 @@
 //! Commands.
 
 pub mod add_reaction;
+pub mod list_custom_emojis;
 pub mod ping;
 
 use std::borrow::Cow;
