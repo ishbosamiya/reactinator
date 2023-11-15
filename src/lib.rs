@@ -1,11 +1,13 @@
 //! Reactinator - Helper bot to react with any emoji.
 
 pub mod commands;
+pub mod context;
 
 use std::collections::HashMap;
 use std::sync::Arc;
 
 use commands::Command;
+use context::BotContext;
 use serenity::{
     async_trait,
     builder::CreateApplicationCommand,
@@ -20,8 +22,8 @@ pub struct Handler {
     /// [`GuildCommands`].
     guild_commands: Arc<RwLock<HashMap<GuildId, GuildCommands>>>,
 
-    /// Last [`MessageId`] for the [`ChannelId`].
-    last_message_ids: Arc<RwLock<HashMap<ChannelId, MessageId>>>,
+    /// [`BotContext`].
+    bot_context: BotContext,
 }
 
 impl Handler {
@@ -29,7 +31,7 @@ impl Handler {
     pub fn new() -> Self {
         Self {
             guild_commands: Arc::new(RwLock::new(HashMap::new())),
-            last_message_ids: Arc::new(RwLock::new(HashMap::new())),
+            bot_context: BotContext::new(),
         }
     }
 }
@@ -83,7 +85,8 @@ impl Default for GuildCommands {
 #[async_trait]
 impl EventHandler for Handler {
     async fn message(&self, _context: Context, message: Message) {
-        self.last_message_ids
+        self.bot_context
+            .last_message_ids
             .write()
             .await
             .insert(message.channel_id, message.id);
