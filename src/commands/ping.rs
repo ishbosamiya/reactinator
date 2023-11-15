@@ -5,6 +5,8 @@ use serenity::{
     model::application::interaction::InteractionResponseType,
 };
 
+use crate::BotContext;
+
 use super::Command;
 
 /// `ping` command.
@@ -12,7 +14,7 @@ pub struct Ping;
 
 #[async_trait]
 impl Command for Ping {
-    fn register(command: &mut CreateApplicationCommand) -> Self {
+    fn register(command: &mut CreateApplicationCommand, _bot_context: &BotContext) -> Self {
         command.name("ping").description("Ping command");
         Self
     }
@@ -21,6 +23,7 @@ impl Command for Ping {
         &mut self,
         command_interaction: &serenity::model::prelude::application_command::ApplicationCommandInteraction,
         context: &serenity::prelude::Context,
+        _bot_context: &BotContext,
     ) {
         if let Err(err) = command_interaction
             .create_interaction_response(&context.http, |response| {

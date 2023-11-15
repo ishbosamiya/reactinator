@@ -9,6 +9,8 @@ use serenity::{
     },
 };
 
+use crate::BotContext;
+
 use super::Command;
 
 /// `add_reaction` command.
@@ -22,7 +24,7 @@ const OPTION_MESSAGE_ID: &str = "message_id";
 
 #[async_trait]
 impl Command for AddReaction {
-    fn register(command: &mut CreateApplicationCommand) -> Self {
+    fn register(command: &mut CreateApplicationCommand, _bot_context: &BotContext) -> Self {
         command
             .name("add_reaction")
             .description("Add a reaction to the given message or previous message.")
@@ -47,6 +49,7 @@ impl Command for AddReaction {
         &mut self,
         command_interaction: &serenity::model::prelude::application_command::ApplicationCommandInteraction,
         context: &serenity::prelude::Context,
+        _bot_context: &BotContext,
     ) {
         let emoji_name =
             match command_interaction.data.options.iter().find_map(|option| {

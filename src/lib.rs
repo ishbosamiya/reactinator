@@ -3,11 +3,12 @@
 pub mod commands;
 pub mod context;
 
+pub use context::BotContext;
+
 use std::collections::HashMap;
 use std::sync::Arc;
 
 use commands::Command;
-use context::BotContext;
 use serenity::{
     async_trait,
     builder::CreateApplicationCommand,
@@ -64,10 +65,13 @@ impl GuildCommands {
         &mut self,
         command_interaction: &ApplicationCommandInteraction,
         context: &Context,
+        bot_context: &BotContext,
     ) {
         match self.0.get_mut(&command_interaction.data.name) {
             Some(command) => {
-                command.interaction(command_interaction, context).await;
+                command
+                    .interaction(command_interaction, context, bot_context)
+                    .await;
             }
             None => {
                 tracing::error!("unknown command {}", command_interaction.data.name);
@@ -102,7 +106,7 @@ impl EventHandler for Handler {
                     match guild_commands.get_mut(guild_id) {
                         Some(guild_commands) => {
                             guild_commands
-                                .interaction(&command_interaction, &context)
+                                .interaction(&command_interaction, &context, &self.bot_context)
                                 .await
                         }
                         None => {
@@ -131,8 +135,9 @@ impl EventHandler for Handler {
                     fn register_command<'a, C: Command>(
                         create_application_command: &'a mut CreateApplicationCommand,
                         guild_commands: &mut GuildCommands,
+                        bot_context: &BotContext,
                     ) -> &'a mut CreateApplicationCommand {
-                        let command = C::register(create_application_command);
+                        let command = C::register(create_application_command, bot_context);
                         guild_commands.insert(&create_application_command, command);
                         create_application_command
                     }
@@ -142,12 +147,14 @@ impl EventHandler for Handler {
                             register_command::<commands::ping::Ping>(
                                 create_application_command,
                                 guild_commands,
+                                &self.bot_context,
                             )
                         })
                         .create_application_command(|create_application_command| {
                             register_command::<commands::add_reaction::AddReaction>(
                                 create_application_command,
                                 guild_commands,
+                                &self.bot_context,
                             )
                         })
                 })
