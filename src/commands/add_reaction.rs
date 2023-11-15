@@ -3,6 +3,7 @@
 use serenity::{
     async_trait,
     builder::CreateApplicationCommand,
+    json::Value,
     model::{
         application::interaction::InteractionResponseType,
         prelude::{command::CommandOptionType, ReactionType},
@@ -50,6 +51,8 @@ impl Command for AddReaction {
         context: &serenity::prelude::Context,
         bot_context: &BotContext,
     ) {
+        let mut add_reaction_err = None;
+
         let emoji_name =
             match command_interaction.data.options.iter().find_map(|option| {
                 (option.name == OPTION_EMOJI_NAME).then_some(option.value.as_ref())
@@ -57,16 +60,12 @@ impl Command for AddReaction {
                 Some(Some(emoji_name)) => match emoji_name.as_str() {
                     Some(emoji_name) => Some(emoji_name),
                     None => {
-                        tracing::error!(
-                            "expected string for {} of `add_reaction`, got `{}`",
-                            OPTION_EMOJI_NAME,
-                            emoji_name
-                        );
+                        add_reaction_err = Some(Error::EmojiNameMustBeString(emoji_name.clone()));
                         None
                     }
                 },
                 _ => {
-                    tracing::error!("required `{}` for `add_reaction`", OPTION_EMOJI_NAME);
+                    add_reaction_err = Some(Error::RequiresEmojiName);
                     None
                 }
             };
@@ -79,20 +78,13 @@ impl Command for AddReaction {
                     Some(message_id) => match message_id.parse::<u64>().ok() {
                         Some(message_id) => Some(message_id),
                         None => {
-                            tracing::error!(
-                                "not a valid message id for `{}` of `add_reaction`, got `{}`",
-                                OPTION_MESSAGE_ID,
-                                message_id
-                            );
+                            add_reaction_err =
+                                Some(Error::InvalidMessageId(message_id.to_string()));
                             None
                         }
                     },
                     None => {
-                        tracing::error!(
-                            "expected string for {} of `add_reaction`, got `{}`",
-                            OPTION_MESSAGE_ID,
-                            message_id
-                        );
+                        add_reaction_err = Some(Error::MessageIdMustBeString(message_id.clone()));
                         None
                     }
                 },
@@ -120,36 +112,68 @@ impl Command for AddReaction {
                         )
                         .await
                     {
-                        tracing::error!(
-                            "couldn't react to message `{}` with `{}` due to `{}`",
-                            message_id,
-                            emoji_name,
-                            err,
-                        );
+                        add_reaction_err = Some(Error::CouldNotReactToMessage(err));
                     }
                 }
                 None => {
-                    tracing::error!("no last message available nor message id provided")
+                    add_reaction_err = Some(Error::NoLastMessageAvailableAndNoMessageIdProvided);
                 }
             }
         }
 
-        if let Err(err) = command_interaction
-            .create_interaction_response(&context.http, |response| {
-                response
-                    .kind(InteractionResponseType::ChannelMessageWithSource)
-                    .interaction_response_data(|message| {
-                        message
-                            .content(format!(
-                                "add_reaction invoked with {}: {:?}, {}: {:?}",
-                                OPTION_EMOJI_NAME, emoji_name, OPTION_MESSAGE_ID, message_id,
-                            ))
-                            .ephemeral(true)
-                    })
-            })
-            .await
-        {
-            tracing::error!("couldn't respond to slash command due to `{}`", err);
+        if let Some(err) = add_reaction_err {
+            tracing::error!(
+                target: "add_reaction",
+                "{}", err
+            );
+
+            if let Err(err) = command_interaction
+                .create_interaction_response(&context.http, |response| {
+                    response
+                        .kind(InteractionResponseType::ChannelMessageWithSource)
+                        .interaction_response_data(|message| {
+                            message
+                                .content(format!("error in `add_reaction`: {}", err))
+                                .ephemeral(true)
+                        })
+                })
+                .await
+            {
+                tracing::error!("couldn't respond to slash command due to `{}`", err);
+            }
         }
     }
 }
+
+/// `add_reaction` related errors.
+#[derive(Debug)]
+pub enum Error {
+    RequiresEmojiName,
+    EmojiNameMustBeString(Value),
+    MessageIdMustBeString(Value),
+    InvalidMessageId(String),
+    CouldNotReactToMessage(serenity::Error),
+    NoLastMessageAvailableAndNoMessageIdProvided,
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "add_reaction: ")?;
+        match self {
+            Error::RequiresEmojiName => write!(f, "requires emoji name"),
+            Error::EmojiNameMustBeString(value) => {
+                write!(f, "emoji name must be a string, got `{}`", value)
+            }
+            Error::MessageIdMustBeString(value) => {
+                write!(f, "message id must be a string, got `{}`", value)
+            }
+            Error::InvalidMessageId(value) => write!(f, "invalid message id, got `{}`", value),
+            Error::CouldNotReactToMessage(err) => write!(f, "could not react to message: {}", err),
+            Error::NoLastMessageAvailableAndNoMessageIdProvided => {
+                write!(f, "no last message available and no message id provided")
+            }
+        }
+    }
+}
+
+impl std::error::Error for Error {}
