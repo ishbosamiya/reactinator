@@ -32,32 +32,65 @@ impl Command for ListCustomEmojis {
         bot_context: &BotContext,
     ) {
         let guild_emojis = bot_context.guild_emojis.read().await;
-        if let Err(err) = command_interaction
-            .create_interaction_response(&context.http, |response| {
-                response
-                    .kind(InteractionResponseType::ChannelMessageWithSource)
-                    .interaction_response_data(|message| {
-                        let emojis = command_interaction
-                            .guild_id
-                            .as_ref()
-                            .and_then(|guild_id| guild_emojis.get(guild_id))
-                            .map(|guild_emojis| {
-                                guild_emojis
-                                    .iter()
-                                    .map(|(emoji_name, emoji)| {
-                                        format!("{} : {}", emoji_name, emoji)
-                                    })
-                                    .collect::<Vec<_>>()
-                                    .join("\n")
-                            });
-                        message
-                            .content(emojis.unwrap_or_else(|| "No custom emojis".to_string()))
-                            .ephemeral(true)
+        let emojis = command_interaction
+            .guild_id
+            .as_ref()
+            .and_then(|guild_id| guild_emojis.get(guild_id))
+            .map(|guild_emojis| {
+                let lines = guild_emojis
+                    .iter()
+                    .map(|(emoji_name, emoji)| format!("{} - `:{}:`", emoji, emoji_name))
+                    .collect::<Vec<_>>();
+
+                let mut joined_lines = vec![String::new()];
+
+                lines.into_iter().for_each(|line| {
+                    let last_joined_line = joined_lines.last_mut().unwrap();
+                    if last_joined_line.len() + line.len() < 2000 {
+                        last_joined_line.push('\n');
+                        last_joined_line.push_str(&line);
+                    } else {
+                        joined_lines.push(line);
+                    }
+                });
+
+                joined_lines
+            });
+
+        match emojis {
+            Some(emojis) => {
+                for emojis in emojis {
+                    if let Err(err) = command_interaction
+                        .create_interaction_response(&context.http, |response| {
+                            response
+                                .kind(InteractionResponseType::ChannelMessageWithSource)
+                                .interaction_response_data(|message| {
+                                    message.content(emojis).ephemeral(true)
+                                })
+                        })
+                        .await
+                    {
+                        tracing::error!(
+                            "couldn't respond to `list_custom_emojis` due to `{}`",
+                            err
+                        );
+                    }
+                }
+            }
+            None => {
+                if let Err(err) = command_interaction
+                    .create_interaction_response(&context.http, |response| {
+                        response
+                            .kind(InteractionResponseType::ChannelMessageWithSource)
+                            .interaction_response_data(|message| {
+                                message.content("No custom emojis").ephemeral(true)
+                            })
                     })
-            })
-            .await
-        {
-            tracing::error!("couldn't respond to `list_custom_emojis` due to `{}`", err);
+                    .await
+                {
+                    tracing::error!("couldn't respond to `list_custom_emojis` due to `{}`", err);
+                }
+            }
         }
     }
 }
