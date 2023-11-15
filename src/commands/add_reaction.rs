@@ -8,7 +8,7 @@ use serenity::{
         application::interaction::InteractionResponseType,
         prelude::{
             application_command::ApplicationCommandInteraction, command::CommandOptionType,
-            ReactionType,
+            ReactionConversionError, ReactionType,
         },
     },
 };
@@ -65,12 +65,12 @@ impl Command for AddReaction {
             Some(Some(emojis)) => match emojis.as_str() {
                 Some(emojis) => Some(emojis),
                 None => {
-                    add_reaction_err = Some(Error::EmojiNameMustBeString(emojis.clone()));
+                    add_reaction_err = Some(Error::EmojiMustBeProvidedInString(emojis.clone()));
                     None
                 }
             },
             _ => {
-                add_reaction_err = Some(Error::RequiresEmojiName);
+                add_reaction_err = Some(Error::RequiresEmoji);
                 None
             }
         };
@@ -114,16 +114,23 @@ impl Command for AddReaction {
                         .map(|emoji| emoji.trim())
                         .filter(|emoji| !emoji.is_empty())
                     {
-                        if let Err(err) = context
-                            .http
-                            .create_reaction(
-                                command_interaction.channel_id.0,
-                                message_id,
-                                &ReactionType::Unicode(emoji.to_string()),
-                            )
-                            .await
-                        {
-                            add_reaction_err = Some(Error::CouldNotReactToMessage(err));
+                        match ReactionType::try_from(emoji) {
+                            Ok(reaction_type) => {
+                                if let Err(err) = context
+                                    .http
+                                    .create_reaction(
+                                        command_interaction.channel_id.0,
+                                        message_id,
+                                        &reaction_type,
+                                    )
+                                    .await
+                                {
+                                    add_reaction_err = Some(Error::CouldNotReactToMessage(err));
+                                }
+                            }
+                            Err(err) => {
+                                add_reaction_err = Some(Error::InvalidEmoji(err));
+                            }
                         }
                     }
                 }
@@ -171,8 +178,9 @@ impl Command for AddReaction {
 /// `add_reaction` related errors.
 #[derive(Debug)]
 pub enum Error {
-    RequiresEmojiName,
-    EmojiNameMustBeString(Value),
+    RequiresEmoji,
+    EmojiMustBeProvidedInString(Value),
+    InvalidEmoji(ReactionConversionError),
     MessageIdMustBeString(Value),
     InvalidMessageId(String),
     CouldNotReactToMessage(serenity::Error),
@@ -183,9 +191,12 @@ impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "add_reaction: ")?;
         match self {
-            Error::RequiresEmojiName => write!(f, "requires emoji name"),
-            Error::EmojiNameMustBeString(value) => {
-                write!(f, "emoji name must be a string, got `{}`", value)
+            Error::RequiresEmoji => write!(f, "requires emoji"),
+            Error::EmojiMustBeProvidedInString(value) => {
+                write!(f, "emoji must be provided in a string, got `{}`", value)
+            }
+            Error::InvalidEmoji(err) => {
+                write!(f, "invalid emoji `{}`", err)
             }
             Error::MessageIdMustBeString(value) => {
                 write!(f, "message id must be a string, got `{}`", value)
