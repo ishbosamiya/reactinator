@@ -88,12 +88,14 @@ impl Default for GuildCommands {
 
 #[async_trait]
 impl EventHandler for Handler {
-    async fn message(&self, _context: Context, message: Message) {
-        self.bot_context
-            .last_message_ids
-            .write()
-            .await
-            .insert(message.channel_id, message.id);
+    async fn message(&self, context: Context, message: Message) {
+        if message.author.id != context.cache.current_user_id() {
+            self.bot_context
+                .last_message_ids
+                .write()
+                .await
+                .insert(message.channel_id, message.id);
+        }
     }
 
     async fn interaction_create(&self, context: Context, interaction: Interaction) {
