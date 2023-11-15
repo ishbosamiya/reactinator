@@ -8,12 +8,12 @@ use serenity::{
         application::interaction::InteractionResponseType,
         prelude::{
             application_command::ApplicationCommandInteraction, command::CommandOptionType,
-            ReactionConversionError, ReactionType,
+            MessageId, ReactionConversionError, ReactionType,
         },
     },
 };
 
-use crate::BotContext;
+use crate::{context::BotAddedEmoji, BotContext};
 
 use super::Command;
 
@@ -81,7 +81,7 @@ impl Command for AddReaction {
             }) {
                 Some(Some(message_id)) => match message_id.as_str() {
                     Some(message_id) => match message_id.parse::<u64>().ok() {
-                        Some(message_id) => Some(message_id),
+                        Some(message_id) => Some(MessageId(message_id)),
                         None => {
                             add_reaction_err =
                                 Some(Error::InvalidMessageId(message_id.to_string()));
@@ -103,7 +103,7 @@ impl Command for AddReaction {
                 .read()
                 .await
                 .get(&command_interaction.channel_id)
-                .map(|message_id| message_id.0),
+                .copied(),
         };
 
         if let Some(emojis) = emojis {
@@ -116,16 +116,34 @@ impl Command for AddReaction {
                     {
                         match ReactionType::try_from(emoji) {
                             Ok(reaction_type) => {
-                                if let Err(err) = context
+                                match context
                                     .http
                                     .create_reaction(
                                         command_interaction.channel_id.0,
-                                        message_id,
+                                        message_id.0,
                                         &reaction_type,
                                     )
                                     .await
                                 {
-                                    add_reaction_err = Some(Error::CouldNotReactToMessage(err));
+                                    Ok(_) => {
+                                        if let Some(guild_id) = command_interaction.guild_id {
+                                            bot_context
+                                                .bot_added_emojis
+                                                .write()
+                                                .await
+                                                .entry(guild_id)
+                                                .or_insert_with(Vec::new)
+                                                .push(BotAddedEmoji {
+                                                    channel_id: command_interaction.channel_id,
+                                                    message_id,
+                                                    user_id: command_interaction.user.id,
+                                                    reaction_type,
+                                                });
+                                        }
+                                    }
+                                    Err(err) => {
+                                        add_reaction_err = Some(Error::CouldNotReactToMessage(err));
+                                    }
                                 }
                             }
                             Err(err) => {
