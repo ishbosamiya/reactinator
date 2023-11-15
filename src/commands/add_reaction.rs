@@ -37,7 +37,6 @@ impl Command for AddReaction {
             })
             .create_option(|command_option| {
                 command_option
-                    .required(true)
                     .kind(CommandOptionType::String)
                     .name(OPTION_MESSAGE_ID)
                     .description("Message ID to react to.")
@@ -49,7 +48,7 @@ impl Command for AddReaction {
         &mut self,
         command_interaction: &serenity::model::prelude::application_command::ApplicationCommandInteraction,
         context: &serenity::prelude::Context,
-        _bot_context: &BotContext,
+        bot_context: &BotContext,
     ) {
         let emoji_name =
             match command_interaction.data.options.iter().find_map(|option| {
@@ -97,28 +96,41 @@ impl Command for AddReaction {
                         None
                     }
                 },
-                _ => {
-                    tracing::error!("required `{}` for `add_reaction`", OPTION_MESSAGE_ID);
-                    None
-                }
+                _ => None,
             };
 
-        if let (Some(emoji_name), Some(message_id)) = (emoji_name, message_id) {
-            if let Err(err) = context
-                .http
-                .create_reaction(
-                    command_interaction.channel_id.0,
-                    message_id,
-                    &ReactionType::Unicode(emoji_name.to_string()),
-                )
-                .await
-            {
-                tracing::error!(
-                    "couldn't react to message `{}` with `{}` due to `{}`",
-                    message_id,
-                    emoji_name,
-                    err,
-                );
+        if let Some(emoji_name) = emoji_name {
+            let message_id = match message_id {
+                Some(message_id) => Some(message_id),
+                None => bot_context
+                    .last_message_ids
+                    .read()
+                    .await
+                    .get(&command_interaction.channel_id)
+                    .map(|message_id| message_id.0),
+            };
+            match message_id {
+                Some(message_id) => {
+                    if let Err(err) = context
+                        .http
+                        .create_reaction(
+                            command_interaction.channel_id.0,
+                            message_id,
+                            &ReactionType::Unicode(emoji_name.to_string()),
+                        )
+                        .await
+                    {
+                        tracing::error!(
+                            "couldn't react to message `{}` with `{}` due to `{}`",
+                            message_id,
+                            emoji_name,
+                            err,
+                        );
+                    }
+                }
+                None => {
+                    tracing::error!("no last message available nor message id provided")
+                }
             }
         }
 
