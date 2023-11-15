@@ -170,6 +170,44 @@ impl EventHandler for Handler {
                     tracing::error!("couldn't create commands due to `{}`", err);
                 }
             }
+
+            match guild_id.emojis(&ctx.http).await {
+                Ok(emojis) => {
+                    self.bot_context
+                        .guild_emojis
+                        .write()
+                        .await
+                        .entry(guild_id)
+                        .or_insert_with(HashMap::new)
+                        .extend(emojis.into_iter().map(|emoji| (emoji.name.clone(), emoji)));
+                }
+                Err(err) => {
+                    tracing::error!(
+                        "couldn't fetch emojis of the guild `{}` due to `{}`",
+                        guild_id,
+                        err
+                    );
+                }
+            }
         }
+    }
+
+    async fn guild_emojis_update(
+        &self,
+        _context: Context,
+        guild_id: GuildId,
+        emojis: HashMap<EmojiId, Emoji>,
+    ) {
+        self.bot_context
+            .guild_emojis
+            .write()
+            .await
+            .entry(guild_id)
+            .or_insert_with(HashMap::new)
+            .extend(
+                emojis
+                    .into_iter()
+                    .map(|(_, emoji)| (emoji.name.clone(), emoji)),
+            );
     }
 }
