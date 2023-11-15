@@ -19,6 +19,9 @@ use serenity::{
 pub struct Handler {
     /// [`GuildCommands`].
     guild_commands: Arc<RwLock<HashMap<GuildId, GuildCommands>>>,
+
+    /// Last [`MessageId`] for the [`ChannelId`].
+    last_message_ids: Arc<RwLock<HashMap<ChannelId, MessageId>>>,
 }
 
 impl Handler {
@@ -26,6 +29,7 @@ impl Handler {
     pub fn new() -> Self {
         Self {
             guild_commands: Arc::new(RwLock::new(HashMap::new())),
+            last_message_ids: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 }
@@ -78,6 +82,13 @@ impl Default for GuildCommands {
 
 #[async_trait]
 impl EventHandler for Handler {
+    async fn message(&self, _context: Context, message: Message) {
+        self.last_message_ids
+            .write()
+            .await
+            .insert(message.channel_id, message.id);
+    }
+
     async fn interaction_create(&self, context: Context, interaction: Interaction) {
         if let Interaction::ApplicationCommand(command_interaction) = interaction {
             tracing::info!("command interaction: {:#?}", command_interaction);
