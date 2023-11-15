@@ -139,10 +139,12 @@ impl Command for AddReaction {
                 response
                     .kind(InteractionResponseType::ChannelMessageWithSource)
                     .interaction_response_data(|message| {
-                        message.content(format!(
-                            "add_reaction invoked with {}: {:?}, {}: {:?}",
-                            OPTION_EMOJI_NAME, emoji_name, OPTION_MESSAGE_ID, message_id,
-                        ))
+                        message
+                            .content(format!(
+                                "add_reaction invoked with {}: {:?}, {}: {:?}",
+                                OPTION_EMOJI_NAME, emoji_name, OPTION_MESSAGE_ID, message_id,
+                            ))
+                            .ephemeral(true)
                     })
             })
             .await
