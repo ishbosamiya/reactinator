@@ -91,16 +91,17 @@ impl Command for AddReaction {
                 _ => None,
             };
 
+        let message_id = match message_id {
+            Some(message_id) => Some(message_id),
+            None => bot_context
+                .last_message_ids
+                .read()
+                .await
+                .get(&command_interaction.channel_id)
+                .map(|message_id| message_id.0),
+        };
+
         if let Some(emoji_name) = emoji_name {
-            let message_id = match message_id {
-                Some(message_id) => Some(message_id),
-                None => bot_context
-                    .last_message_ids
-                    .read()
-                    .await
-                    .get(&command_interaction.channel_id)
-                    .map(|message_id| message_id.0),
-            };
             match message_id {
                 Some(message_id) => {
                     if let Err(err) = context
@@ -121,26 +122,37 @@ impl Command for AddReaction {
             }
         }
 
-        if let Some(err) = add_reaction_err {
+        if let Some(add_reaction_err) = &add_reaction_err {
             tracing::error!(
                 target: "add_reaction",
-                "{}", err
+                "{}", add_reaction_err
             );
+        }
 
-            if let Err(err) = command_interaction
-                .create_interaction_response(&context.http, |response| {
-                    response
-                        .kind(InteractionResponseType::ChannelMessageWithSource)
-                        .interaction_response_data(|message| {
-                            message
-                                .content(format!("error in `add_reaction`: {}", err))
-                                .ephemeral(true)
-                        })
-                })
-                .await
-            {
-                tracing::error!("couldn't respond to slash command due to `{}`", err);
-            }
+        if let Err(err) = command_interaction
+            .create_interaction_response(&context.http, |response| {
+                response
+                    .kind(InteractionResponseType::ChannelMessageWithSource)
+                    .interaction_response_data(|message| {
+                        message
+                            .content(if let Some(err) = add_reaction_err {
+                                format!("error: {}", err)
+                            } else {
+                                format!(
+                                    "added `{}` reaction to `{}`",
+                                    emoji_name.unwrap(),
+                                    message_id.unwrap()
+                                )
+                            })
+                            .ephemeral(true)
+                    })
+            })
+            .await
+        {
+            tracing::error!(
+                "couldn't respond error message to slash command due to `{}`",
+                err
+            );
         }
     }
 }
