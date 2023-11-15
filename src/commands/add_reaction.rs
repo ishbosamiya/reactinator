@@ -126,6 +126,12 @@ impl Command for AddReaction {
                                     .await
                                 {
                                     Ok(_) => {
+                                        tracing::info!(
+                                            "added reaction `{}` to `{}`",
+                                            reaction_type,
+                                            message_id
+                                        );
+
                                         if let Some(guild_id) = command_interaction.guild_id {
                                             bot_context
                                                 .bot_added_emojis
@@ -175,9 +181,10 @@ impl Command for AddReaction {
                                 format!("error: {}", err)
                             } else {
                                 format!(
-                                    "added `{}` reaction to `{}`",
+                                    "Don't forget to react to message `{}` \
+                                     yourself for the reactions {}.",
+                                    message_id.unwrap(),
                                     emojis.unwrap(),
-                                    message_id.unwrap()
                                 )
                             })
                             .ephemeral(true)
