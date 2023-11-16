@@ -120,80 +120,21 @@ impl Command for TextToReactions {
 
         let message_id = match message_id {
             Some(message_id) => Some(message_id),
-            None => bot_context
+            None => match bot_context
                 .last_message_ids
                 .read()
                 .await
                 .get(&command_interaction.channel_id)
-                .copied(),
-        };
-
-        if let Some(emoji_text) = &emoji_text {
-            match message_id {
-                Some(message_id) => {
-                    for emoji in emoji_text
-                        .split_whitespace()
-                        .map(|emoji| emoji.trim())
-                        .filter(|emoji| !emoji.is_empty())
-                    {
-                        match ReactionType::try_from(emoji) {
-                            Ok(reaction_type) => {
-                                match context
-                                    .http
-                                    .create_reaction(
-                                        command_interaction.channel_id.0,
-                                        message_id.0,
-                                        &reaction_type,
-                                    )
-                                    .await
-                                {
-                                    Ok(_) => {
-                                        tracing::info!(
-                                            "added reaction `{}` to `{}`",
-                                            reaction_type,
-                                            message_id
-                                        );
-
-                                        if let Some(guild_id) = command_interaction.guild_id {
-                                            bot_context
-                                                .bot_added_emojis
-                                                .write()
-                                                .await
-                                                .entry(guild_id)
-                                                .or_insert_with(Vec::new)
-                                                .push(BotAddedEmoji {
-                                                    channel_id: command_interaction.channel_id,
-                                                    message_id,
-                                                    user_id: command_interaction.user.id,
-                                                    reaction_type,
-                                                });
-                                        }
-                                    }
-                                    Err(err) => {
-                                        text_to_reactions_err =
-                                            Some(Error::CouldNotReactToMessage(err));
-                                    }
-                                }
-                            }
-                            Err(err) => {
-                                text_to_reactions_err = Some(Error::InvalidEmoji(err));
-                            }
-                        }
-                    }
-                }
+                .copied()
+            {
+                Some(message_id) => Some(message_id),
                 None => {
                     text_to_reactions_err =
                         Some(Error::NoLastMessageAvailableAndNoMessageIdProvided);
+                    None
                 }
-            }
-        }
-
-        if let Some(text_to_reactions_err) = &text_to_reactions_err {
-            tracing::error!(
-                target: "text_to_reactions",
-                "{}", text_to_reactions_err
-            );
-        }
+            },
+        };
 
         if let Err(err) = command_interaction
             .create_interaction_response(&context.http, |response| {
@@ -201,14 +142,14 @@ impl Command for TextToReactions {
                     .kind(InteractionResponseType::ChannelMessageWithSource)
                     .interaction_response_data(|message| {
                         message
-                            .content(if let Some(err) = text_to_reactions_err {
+                            .content(if let Some(err) = text_to_reactions_err.take() {
                                 format!("error: {}", err)
                             } else {
                                 format!(
                                     "Don't forget to react to message `{}` \
                                      yourself for the reactions {}.",
                                     message_id.unwrap(),
-                                    emoji_text.unwrap(),
+                                    emoji_text.as_ref().unwrap(),
                                 )
                             })
                             .ephemeral(true)
@@ -220,6 +161,76 @@ impl Command for TextToReactions {
                 "couldn't respond error message to slash command due to `{}`",
                 err
             );
+        }
+
+        if let (Some(emoji_text), Some(message_id)) = (emoji_text, message_id) {
+            for emoji in emoji_text
+                .split_whitespace()
+                .map(|emoji| emoji.trim())
+                .filter(|emoji| !emoji.is_empty())
+            {
+                match ReactionType::try_from(emoji) {
+                    Ok(reaction_type) => {
+                        match context
+                            .http
+                            .create_reaction(
+                                command_interaction.channel_id.0,
+                                message_id.0,
+                                &reaction_type,
+                            )
+                            .await
+                        {
+                            Ok(_) => {
+                                tracing::info!(
+                                    "added reaction `{}` to `{}`",
+                                    reaction_type,
+                                    message_id
+                                );
+
+                                if let Some(guild_id) = command_interaction.guild_id {
+                                    bot_context
+                                        .bot_added_emojis
+                                        .write()
+                                        .await
+                                        .entry(guild_id)
+                                        .or_insert_with(Vec::new)
+                                        .push(BotAddedEmoji {
+                                            channel_id: command_interaction.channel_id,
+                                            message_id,
+                                            user_id: command_interaction.user.id,
+                                            reaction_type,
+                                        });
+                                }
+                            }
+                            Err(err) => {
+                                text_to_reactions_err = Some(Error::CouldNotReactToMessage(err));
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        text_to_reactions_err = Some(Error::InvalidEmoji(err));
+                    }
+                }
+            }
+        }
+
+        if let Some(text_to_reactions_err) = &text_to_reactions_err {
+            tracing::error!(
+                target: "text_to_reactions",
+                "{}", text_to_reactions_err
+            );
+
+            if let Err(err) = command_interaction
+                .edit_original_interaction_response(&context.http, |response| {
+                    response.content(format!("error: {}", text_to_reactions_err))
+                })
+                .await
+            {
+                tracing::error!(
+                    "couldn't edit interaction response message to slash command due to `{}`",
+                    err
+                );
+            }
         }
     }
 }
