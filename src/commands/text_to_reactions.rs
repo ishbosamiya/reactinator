@@ -242,13 +242,6 @@ pub fn text_to_emojis(text: &str) -> Option<String> {
             ('z', &['s']),
         ].into_iter().collect();
 
-        /// Allowed frequency for the [`char`]s.
-        pub static ref ALLOWED_FREQUENCY: HashMap<char, usize> = [
-            ('a', 2),
-            ('b', 2),
-            ('i', 2)
-        ].into_iter().collect();
-
         /// [`char`] to `emoji`.
         pub static ref CHAR_TO_EMOJI: HashMap<char, Arc<[String]>> = [
             ('0', "zero"),
@@ -275,37 +268,49 @@ pub fn text_to_emojis(text: &str) -> Option<String> {
             .collect();
     }
 
-    let mut used_characters = HashMap::new();
-    text.to_lowercase()
-        .chars()
-        .filter(|c| !c.is_whitespace())
-        .map(|c| {
-            if used_characters.contains_key(&c) {
-                if used_characters.get(&c).unwrap() < ALLOWED_FREQUENCY.get(&c).unwrap_or(&1) {
-                    *used_characters.get_mut(&c).unwrap() += 1;
-                    Some(c)
-                } else {
-                    let alternative =
-                        *ALTERNATIVES
-                            .get(&c)?
-                            .iter()
-                            .find(|c| match used_characters.get(*c) {
-                                Some(num_allowed) => {
-                                    num_allowed < ALLOWED_FREQUENCY.get(c).unwrap_or(&1)
-                                }
+    let mut used_characters: HashMap<char, usize> = HashMap::new();
+    Some(
+        text.to_lowercase()
+            .chars()
+            .filter(|c| !c.is_whitespace())
+            .map(|c| {
+                if used_characters.contains_key(&c) {
+                    if *used_characters.get(&c).unwrap() < CHAR_TO_EMOJI.get(&c)?.len() {
+                        let emoji = CHAR_TO_EMOJI.get(&c).unwrap()
+                            [*used_characters.get(&c).unwrap()]
+                        .as_str();
+
+                        *used_characters.get_mut(&c).unwrap() += 1;
+
+                        Some(emoji)
+                    } else {
+                        let alternative = *ALTERNATIVES.get(&c)?.iter().find(|c| {
+                            match used_characters.get(*c) {
+                                Some(num_allowed) => match CHAR_TO_EMOJI.get(&c) {
+                                    Some(char_to_emoji) => *num_allowed < char_to_emoji.len(),
+                                    None => false,
+                                },
                                 None => true,
-                            })?;
+                            }
+                        })?;
 
-                    *used_characters.entry(alternative).or_insert(0) += 1;
+                        let alternative_emoji = CHAR_TO_EMOJI.get(&alternative).unwrap()
+                            [*used_characters.entry(alternative).or_insert(0)]
+                        .as_str();
 
-                    Some(alternative)
+                        *used_characters.get_mut(&alternative).unwrap() += 1;
+
+                        Some(alternative_emoji)
+                    }
+                } else {
+                    let alternative_emoji = CHAR_TO_EMOJI.get(&c)?[0].as_str();
+                    used_characters.insert(c, 1);
+                    Some(alternative_emoji)
                 }
-            } else {
-                used_characters.insert(c, 1);
-                Some(c)
-            }
-        })
-        .collect()
+            })
+            .collect::<Option<Vec<_>>>()?
+            .join(" "),
+    )
 }
 
 /// `text_to_reactions` related errors.
