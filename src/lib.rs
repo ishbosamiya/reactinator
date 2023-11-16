@@ -166,6 +166,13 @@ impl EventHandler for Handler {
                                 &self.bot_context,
                             )
                         })
+                        .create_application_command(|create_application_command| {
+                            register_command::<commands::text_to_reactions::TextToReactions>(
+                                create_application_command,
+                                guild_commands,
+                                &self.bot_context,
+                            )
+                        })
                 })
                 .await;
 
