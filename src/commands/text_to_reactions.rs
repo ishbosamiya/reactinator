@@ -240,8 +240,8 @@ lazy_static! {
         ('z', &['s']),
     ].into_iter().collect();
 
-    /// [`text_to_emojis()`]: [`char`] to `emoji`.
-    pub static ref TEXT_TO_EMOJIS_CHAR_TO_EMOJI: HashMap<char, Arc<[String]>> = [
+    /// [`text_to_emojis()`]: [`char`] to `emoji_name`.
+    pub static ref TEXT_TO_EMOJIS_CHAR_TO_EMOJI_NAME: HashMap<char, Arc<[String]>> = [
         ('0', "zero"),
         ('1', "one"),
         ('2', "two"),
@@ -258,12 +258,64 @@ lazy_static! {
         .chain(('a'..='z').map(|ch| {
             let regional_indicator = format!(":regional_indicator_{}:", ch);
             match ch {
-                'a' | 'b' => (ch, Arc::from_iter([regional_indicator, format!(":{}:", ch)])),
+                'a' | 'b' | 'm' => (ch, Arc::from_iter([regional_indicator, format!(":{}:", ch)])),
+                'o' => (ch, Arc::from_iter([regional_indicator, ":o:".to_string(), ":o2:".to_string()])),
+                'p' => (ch, Arc::from_iter([regional_indicator, ":parking:".to_string()])),
                 'i' => (ch, Arc::from_iter([regional_indicator, ":information_source:".to_string()])),
                 _ => (ch, Arc::from_iter([regional_indicator]))
             }
         }))
         .collect();
+
+    /// [`text_to_emojis()`]: `emoji_name` to [`char`] emoji.
+    pub static ref TEXT_TO_EMOJIS_EMOJI_NAME_TO_EMOJI: HashMap<&'static str, &'static str> = {
+        [
+            (":regional_indicator_a:", "🇦"),
+            (":regional_indicator_b:", "🇧"),
+            (":regional_indicator_c:", "🇨"),
+            (":regional_indicator_d:", "🇩"),
+            (":regional_indicator_e:", "🇪"),
+            (":regional_indicator_f:", "🇫"),
+            (":regional_indicator_g:", "🇬"),
+            (":regional_indicator_h:", "🇭"),
+            (":regional_indicator_i:", "🇮"),
+            (":regional_indicator_j:", "🇯"),
+            (":regional_indicator_k:", "🇰"),
+            (":regional_indicator_l:", "🇱"),
+            (":regional_indicator_m:", "🇲"),
+            (":regional_indicator_n:", "🇳"),
+            (":regional_indicator_o:", "🇴"),
+            (":regional_indicator_p:", "🇵"),
+            (":regional_indicator_q:", "🇶"),
+            (":regional_indicator_r:", "🇷"),
+            (":regional_indicator_s:", "🇸"),
+            (":regional_indicator_t:", "🇹"),
+            (":regional_indicator_u:", "🇺"),
+            (":regional_indicator_v:", "🇻"),
+            (":regional_indicator_w:", "🇼"),
+            (":regional_indicator_x:", "🇽"),
+            (":regional_indicator_y:", "🇾"),
+            (":regional_indicator_z:", "🇿"),
+            (":zero:", "0️⃣"),
+            (":one:", "1️⃣"),
+            (":two:", "2️⃣"),
+            (":three:", "3️⃣"),
+            (":four:", "4️⃣"),
+            (":five:", "5️⃣"),
+            (":six:", "6️⃣"),
+            (":seven:", "7️⃣"),
+            (":eight:", "8️⃣"),
+            (":nine:", "9️⃣"),
+            (":keycap_ten:", "🔟"),
+            (":information_source:", "ℹ️"),
+            (":a:", "🅰️"),
+            (":b:", "🅱️"),
+            (":o2:", "🅾️"),
+            (":o:", "⭕"),
+            (":m:", "Ⓜ️"),
+            (":parking:", "🅿️"),
+        ].into_iter().collect()
+    };
 }
 
 /// Text to emoji compatible text.
@@ -276,9 +328,9 @@ pub fn text_to_emojis(text: &str) -> Option<String> {
             .map(|c| {
                 if used_characters.contains_key(&c) {
                     if *used_characters.get(&c).unwrap()
-                        < TEXT_TO_EMOJIS_CHAR_TO_EMOJI.get(&c)?.len()
+                        < TEXT_TO_EMOJIS_CHAR_TO_EMOJI_NAME.get(&c)?.len()
                     {
-                        let emoji = TEXT_TO_EMOJIS_CHAR_TO_EMOJI.get(&c).unwrap()
+                        let emoji = TEXT_TO_EMOJIS_CHAR_TO_EMOJI_NAME.get(&c).unwrap()
                             [*used_characters.get(&c).unwrap()]
                         .as_str();
 
@@ -289,7 +341,8 @@ pub fn text_to_emojis(text: &str) -> Option<String> {
                         let alternative =
                             *TEXT_TO_EMOJIS_ALTERNATIVES.get(&c)?.iter().find(|c| {
                                 match used_characters.get(*c) {
-                                    Some(num_allowed) => match TEXT_TO_EMOJIS_CHAR_TO_EMOJI.get(&c)
+                                    Some(num_allowed) => match TEXT_TO_EMOJIS_CHAR_TO_EMOJI_NAME
+                                        .get(&c)
                                     {
                                         Some(char_to_emoji) => *num_allowed < char_to_emoji.len(),
                                         None => false,
@@ -298,7 +351,7 @@ pub fn text_to_emojis(text: &str) -> Option<String> {
                                 }
                             })?;
 
-                        let alternative_emoji = TEXT_TO_EMOJIS_CHAR_TO_EMOJI
+                        let alternative_emoji = TEXT_TO_EMOJIS_CHAR_TO_EMOJI_NAME
                             .get(&alternative)
                             .unwrap()[*used_characters.entry(alternative).or_insert(0)]
                         .as_str();
@@ -308,10 +361,14 @@ pub fn text_to_emojis(text: &str) -> Option<String> {
                         Some(alternative_emoji)
                     }
                 } else {
-                    let alternative_emoji = TEXT_TO_EMOJIS_CHAR_TO_EMOJI.get(&c)?[0].as_str();
+                    let alternative_emoji = TEXT_TO_EMOJIS_CHAR_TO_EMOJI_NAME.get(&c)?[0].as_str();
                     used_characters.insert(c, 1);
                     Some(alternative_emoji)
                 }
+            })
+            .map(|emoji_name| {
+                emoji_name
+                    .map(|emoji_name| *TEXT_TO_EMOJIS_EMOJI_NAME_TO_EMOJI.get(emoji_name).unwrap())
             })
             .collect::<Option<Vec<_>>>()?
             .join(" "),
@@ -357,24 +414,23 @@ impl std::error::Error for Error {}
 
 #[cfg(test)]
 mod tests {
-    use super::{text_to_emojis, TEXT_TO_EMOJIS_CHAR_TO_EMOJI};
+    use crate::commands::text_to_reactions::TEXT_TO_EMOJIS_EMOJI_NAME_TO_EMOJI;
+
+    use super::{text_to_emojis, TEXT_TO_EMOJIS_CHAR_TO_EMOJI_NAME};
 
     /// Basic test of alternatives.
     #[test]
     fn text_to_emojis_01() {
-        assert_eq!(text_to_emojis("a").unwrap(), ":regional_indicator_a:");
-        assert_eq!(text_to_emojis("aa").unwrap(), ":regional_indicator_a: :a:");
-        assert_eq!(
-            text_to_emojis("aaa").unwrap(),
-            ":regional_indicator_a: :a: :four:"
-        );
+        assert_eq!(text_to_emojis("a").unwrap(), "🇦");
+        assert_eq!(text_to_emojis("aa").unwrap(), "🇦 🅰️");
+        assert_eq!(text_to_emojis("aaa").unwrap(), "🇦 🅰️ 4️⃣");
         assert_eq!(text_to_emojis("aaaa"), None);
     }
 
     /// Test all the characters, does not test the alternatives.
     #[test]
     fn text_to_emojis_02() {
-        let mut char_to_emoji = TEXT_TO_EMOJIS_CHAR_TO_EMOJI
+        let mut char_to_emoji = TEXT_TO_EMOJIS_CHAR_TO_EMOJI_NAME
             .iter()
             .map(|(key, value)| (*key, value))
             .collect::<Vec<_>>();
@@ -387,8 +443,12 @@ mod tests {
             .collect::<String>();
         let emoji_string = char_to_emoji
             .iter()
-            .flat_map(|(_, emojis)| &***emojis)
-            .map(|emoji| emoji.as_str())
+            .flat_map(|(_, emoji_names)| &***emoji_names)
+            .map(|emoji_name| {
+                *TEXT_TO_EMOJIS_EMOJI_NAME_TO_EMOJI
+                    .get(emoji_name.as_str())
+                    .unwrap()
+            })
             .collect::<Vec<_>>()
             .join(" ");
 
