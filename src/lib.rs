@@ -145,13 +145,13 @@ impl EventHandler for Handler {
                     }
 
                     commands
-                        .create_application_command(|create_application_command| {
-                            register_command::<commands::ping::Ping>(
-                                create_application_command,
-                                guild_commands,
-                                &self.bot_context,
-                            )
-                        })
+                        // .create_application_command(|create_application_command| {
+                        //     register_command::<commands::ping::Ping>(
+                        //         create_application_command,
+                        //         guild_commands,
+                        //         &self.bot_context,
+                        //     )
+                        // })
                         .create_application_command(|create_application_command| {
                             register_command::<commands::add_reaction::AddReaction>(
                                 create_application_command,
