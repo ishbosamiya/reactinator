@@ -349,3 +349,19 @@ impl std::fmt::Display for Error {
 }
 
 impl std::error::Error for Error {}
+
+#[cfg(test)]
+mod tests {
+    use super::text_to_emojis;
+
+    #[test]
+    fn text_to_emojis_01() {
+        assert_eq!(text_to_emojis("a").unwrap(), ":regional_indicator_a:");
+        assert_eq!(text_to_emojis("aa").unwrap(), ":regional_indicator_a: :a:");
+        assert_eq!(
+            text_to_emojis("aaa").unwrap(),
+            ":regional_indicator_a: :a: :four:"
+        );
+        assert_eq!(text_to_emojis("aaaa"), None);
+    }
+}
