@@ -233,7 +233,8 @@ impl EventHandler for Handler {
                     |(bot_added_emoji_index, bot_added_emoji)| {
                         (bot_added_emoji.channel_id == reaction.channel_id
                             && bot_added_emoji.message_id == reaction.message_id
-                            && bot_added_emoji.user_id == user_id)
+                            && bot_added_emoji.user_id == user_id
+                            && bot_added_emoji.reaction_type == reaction.emoji)
                             .then_some(bot_added_emoji_index)
                     },
                 ) {
