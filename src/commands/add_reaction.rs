@@ -98,78 +98,20 @@ impl Command for AddReaction {
 
         let message_id = match message_id {
             Some(message_id) => Some(message_id),
-            None => bot_context
+            None => match bot_context
                 .last_message_ids
                 .read()
                 .await
                 .get(&command_interaction.channel_id)
-                .copied(),
-        };
-
-        if let Some(emojis) = emojis {
-            match message_id {
-                Some(message_id) => {
-                    for emoji in emojis
-                        .split_whitespace()
-                        .map(|emoji| emoji.trim())
-                        .filter(|emoji| !emoji.is_empty())
-                    {
-                        match ReactionType::try_from(emoji) {
-                            Ok(reaction_type) => {
-                                match context
-                                    .http
-                                    .create_reaction(
-                                        command_interaction.channel_id.0,
-                                        message_id.0,
-                                        &reaction_type,
-                                    )
-                                    .await
-                                {
-                                    Ok(_) => {
-                                        tracing::info!(
-                                            "added reaction `{}` to `{}`",
-                                            reaction_type,
-                                            message_id
-                                        );
-
-                                        if let Some(guild_id) = command_interaction.guild_id {
-                                            bot_context
-                                                .bot_added_emojis
-                                                .write()
-                                                .await
-                                                .entry(guild_id)
-                                                .or_insert_with(Vec::new)
-                                                .push(BotAddedEmoji {
-                                                    channel_id: command_interaction.channel_id,
-                                                    message_id,
-                                                    user_id: command_interaction.user.id,
-                                                    reaction_type,
-                                                });
-                                        }
-                                    }
-                                    Err(err) => {
-                                        add_reaction_err = Some(Error::CouldNotReactToMessage(err));
-                                    }
-                                }
-                            }
-                            Err(err) => {
-                                add_reaction_err = Some(Error::InvalidEmoji(err));
-                            }
-                        }
-                    }
-                }
+                .copied()
+            {
+                Some(message_id) => Some(message_id),
                 None => {
                     add_reaction_err = Some(Error::NoLastMessageAvailableAndNoMessageIdProvided);
+                    None
                 }
-            }
-        }
-
-        if let Some(add_reaction_err) = &add_reaction_err {
-            tracing::error!(
-                target: "add_reaction",
-                "{}", add_reaction_err
-            );
-        }
+            },
+        };
 
         if let Err(err) = command_interaction
             .create_interaction_response(&context.http, |response| {
@@ -177,7 +119,7 @@ impl Command for AddReaction {
                     .kind(InteractionResponseType::ChannelMessageWithSource)
                     .interaction_response_data(|message| {
                         message
-                            .content(if let Some(err) = add_reaction_err {
+                            .content(if let Some(err) = add_reaction_err.take() {
                                 format!("error: {}", err)
                             } else {
                                 format!(
@@ -196,6 +138,76 @@ impl Command for AddReaction {
                 "couldn't respond error message to slash command due to `{}`",
                 err
             );
+        }
+
+        if let (Some(emojis), Some(message_id)) = (emojis, message_id) {
+            for emoji in emojis
+                .split_whitespace()
+                .map(|emoji| emoji.trim())
+                .filter(|emoji| !emoji.is_empty())
+            {
+                match ReactionType::try_from(emoji) {
+                    Ok(reaction_type) => {
+                        match context
+                            .http
+                            .create_reaction(
+                                command_interaction.channel_id.0,
+                                message_id.0,
+                                &reaction_type,
+                            )
+                            .await
+                        {
+                            Ok(_) => {
+                                tracing::info!(
+                                    "added reaction `{}` to `{}`",
+                                    reaction_type,
+                                    message_id
+                                );
+
+                                if let Some(guild_id) = command_interaction.guild_id {
+                                    bot_context
+                                        .bot_added_emojis
+                                        .write()
+                                        .await
+                                        .entry(guild_id)
+                                        .or_insert_with(Vec::new)
+                                        .push(BotAddedEmoji {
+                                            channel_id: command_interaction.channel_id,
+                                            message_id,
+                                            user_id: command_interaction.user.id,
+                                            reaction_type,
+                                        });
+                                }
+                            }
+                            Err(err) => {
+                                add_reaction_err = Some(Error::CouldNotReactToMessage(err));
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        add_reaction_err = Some(Error::InvalidEmoji(err));
+                    }
+                }
+            }
+        }
+
+        if let Some(add_reaction_err) = &add_reaction_err {
+            tracing::error!(
+                target: "add_reaction",
+                "{}", add_reaction_err
+            );
+
+            if let Err(err) = command_interaction
+                .edit_original_interaction_response(&context.http, |response| {
+                    response.content(format!("error: {}", add_reaction_err))
+                })
+                .await
+            {
+                tracing::error!(
+                    "couldn't edit interaction response message to slash command due to `{}`",
+                    err
+                );
+            }
         }
     }
 }
