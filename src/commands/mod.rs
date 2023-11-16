@@ -3,6 +3,7 @@
 pub mod add_reaction;
 pub mod list_custom_emojis;
 pub mod ping;
+pub mod text_to_reactions;
 
 use std::borrow::Cow;
 
