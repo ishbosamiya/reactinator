@@ -1,7 +1,7 @@
 //! Add the given text as list of reactions to the given message or
 //! previous message.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use lazy_static::lazy_static;
 use serenity::{
@@ -248,6 +248,31 @@ pub fn text_to_emojis(text: &str) -> Option<String> {
             ('b', 2),
             ('i', 2)
         ].into_iter().collect();
+
+        /// [`char`] to `emoji`.
+        pub static ref CHAR_TO_EMOJI: HashMap<char, Arc<[String]>> = [
+            ('0', "zero"),
+            ('1', "one"),
+            ('2', "two"),
+            ('3', "three"),
+            ('4', "four"),
+            ('5', "five"),
+            ('6', "six"),
+            ('7', "seven"),
+            ('8', "eight"),
+            ('9', "nine"),
+        ].into_iter()
+            .map(|(key, emoji)| (key, [format!(":{}:", emoji)]))
+            .map(|(key, emoji)| (key, Arc::from_iter(emoji)))
+            .chain(('a'..='z').map(|ch| {
+                let regional_indicator = format!(":regional_indicator_{}:", ch);
+                match ch {
+                    'a' | 'b' => (ch, Arc::from_iter([regional_indicator, format!(":{}:", ch)])),
+                    'i' => (ch, Arc::from_iter([regional_indicator, ":information_source:".to_string()])),
+                    _ => (ch, Arc::from_iter([regional_indicator]))
+                }
+            }))
+            .collect();
     }
 
     let mut used_characters = HashMap::new();
