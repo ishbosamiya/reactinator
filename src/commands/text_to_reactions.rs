@@ -224,50 +224,50 @@ impl Command for TextToReactions {
     }
 }
 
+lazy_static! {
+    /// [`text_to_emojis()`]: alternatives for the [`char`]s.
+    pub static ref TEXT_TO_EMOJIS_ALTERNATIVES: HashMap<char, &'static [char]> = [
+        ('a', ['4'].as_slice()),
+        ('b', &['8']),
+        ('e', &['3']),
+        ('g', &['9']),
+        ('i', &['1', '!']),
+        ('l', &['1']),
+        ('o', &['0']),
+        ('s', &['5', '$', 'z']),
+        ('t', &['7']),
+        ('u', &['v']),
+        ('z', &['s']),
+    ].into_iter().collect();
+
+    /// [`text_to_emojis()`]: [`char`] to `emoji`.
+    pub static ref TEXT_TO_EMOJIS_CHAR_TO_EMOJI: HashMap<char, Arc<[String]>> = [
+        ('0', "zero"),
+        ('1', "one"),
+        ('2', "two"),
+        ('3', "three"),
+        ('4', "four"),
+        ('5', "five"),
+        ('6', "six"),
+        ('7', "seven"),
+        ('8', "eight"),
+        ('9', "nine"),
+    ].into_iter()
+        .map(|(key, emoji)| (key, [format!(":{}:", emoji)]))
+        .map(|(key, emoji)| (key, Arc::from_iter(emoji)))
+        .chain(('a'..='z').map(|ch| {
+            let regional_indicator = format!(":regional_indicator_{}:", ch);
+            match ch {
+                'a' | 'b' => (ch, Arc::from_iter([regional_indicator, format!(":{}:", ch)])),
+                'i' => (ch, Arc::from_iter([regional_indicator, ":information_source:".to_string()])),
+                _ => (ch, Arc::from_iter([regional_indicator]))
+            }
+        }))
+        .collect();
+}
+
 /// Text to emoji compatible text.
 pub fn text_to_emojis(text: &str) -> Option<String> {
-    lazy_static! {
-        /// Alternatives for the [`char`]s.
-        pub static ref ALTERNATIVES: HashMap<char, &'static [char]> = [
-            ('a', ['4'].as_slice()),
-            ('b', &['8']),
-            ('e', &['3']),
-            ('g', &['9']),
-            ('i', &['1', '!']),
-            ('l', &['1']),
-            ('o', &['0']),
-            ('s', &['5', '$', 'z']),
-            ('t', &['7']),
-            ('u', &['v']),
-            ('z', &['s']),
-        ].into_iter().collect();
-
-        /// [`char`] to `emoji`.
-        pub static ref CHAR_TO_EMOJI: HashMap<char, Arc<[String]>> = [
-            ('0', "zero"),
-            ('1', "one"),
-            ('2', "two"),
-            ('3', "three"),
-            ('4', "four"),
-            ('5', "five"),
-            ('6', "six"),
-            ('7', "seven"),
-            ('8', "eight"),
-            ('9', "nine"),
-        ].into_iter()
-            .map(|(key, emoji)| (key, [format!(":{}:", emoji)]))
-            .map(|(key, emoji)| (key, Arc::from_iter(emoji)))
-            .chain(('a'..='z').map(|ch| {
-                let regional_indicator = format!(":regional_indicator_{}:", ch);
-                match ch {
-                    'a' | 'b' => (ch, Arc::from_iter([regional_indicator, format!(":{}:", ch)])),
-                    'i' => (ch, Arc::from_iter([regional_indicator, ":information_source:".to_string()])),
-                    _ => (ch, Arc::from_iter([regional_indicator]))
-                }
-            }))
-            .collect();
-    }
-
     let mut used_characters: HashMap<char, usize> = HashMap::new();
     Some(
         text.to_lowercase()
@@ -275,8 +275,10 @@ pub fn text_to_emojis(text: &str) -> Option<String> {
             .filter(|c| !c.is_whitespace())
             .map(|c| {
                 if used_characters.contains_key(&c) {
-                    if *used_characters.get(&c).unwrap() < CHAR_TO_EMOJI.get(&c)?.len() {
-                        let emoji = CHAR_TO_EMOJI.get(&c).unwrap()
+                    if *used_characters.get(&c).unwrap()
+                        < TEXT_TO_EMOJIS_CHAR_TO_EMOJI.get(&c)?.len()
+                    {
+                        let emoji = TEXT_TO_EMOJIS_CHAR_TO_EMOJI.get(&c).unwrap()
                             [*used_characters.get(&c).unwrap()]
                         .as_str();
 
@@ -284,18 +286,21 @@ pub fn text_to_emojis(text: &str) -> Option<String> {
 
                         Some(emoji)
                     } else {
-                        let alternative = *ALTERNATIVES.get(&c)?.iter().find(|c| {
-                            match used_characters.get(*c) {
-                                Some(num_allowed) => match CHAR_TO_EMOJI.get(&c) {
-                                    Some(char_to_emoji) => *num_allowed < char_to_emoji.len(),
-                                    None => false,
-                                },
-                                None => true,
-                            }
-                        })?;
+                        let alternative =
+                            *TEXT_TO_EMOJIS_ALTERNATIVES.get(&c)?.iter().find(|c| {
+                                match used_characters.get(*c) {
+                                    Some(num_allowed) => match TEXT_TO_EMOJIS_CHAR_TO_EMOJI.get(&c)
+                                    {
+                                        Some(char_to_emoji) => *num_allowed < char_to_emoji.len(),
+                                        None => false,
+                                    },
+                                    None => true,
+                                }
+                            })?;
 
-                        let alternative_emoji = CHAR_TO_EMOJI.get(&alternative).unwrap()
-                            [*used_characters.entry(alternative).or_insert(0)]
+                        let alternative_emoji = TEXT_TO_EMOJIS_CHAR_TO_EMOJI
+                            .get(&alternative)
+                            .unwrap()[*used_characters.entry(alternative).or_insert(0)]
                         .as_str();
 
                         *used_characters.get_mut(&alternative).unwrap() += 1;
@@ -303,7 +308,7 @@ pub fn text_to_emojis(text: &str) -> Option<String> {
                         Some(alternative_emoji)
                     }
                 } else {
-                    let alternative_emoji = CHAR_TO_EMOJI.get(&c)?[0].as_str();
+                    let alternative_emoji = TEXT_TO_EMOJIS_CHAR_TO_EMOJI.get(&c)?[0].as_str();
                     used_characters.insert(c, 1);
                     Some(alternative_emoji)
                 }
@@ -352,8 +357,9 @@ impl std::error::Error for Error {}
 
 #[cfg(test)]
 mod tests {
-    use super::text_to_emojis;
+    use super::{text_to_emojis, TEXT_TO_EMOJIS_CHAR_TO_EMOJI};
 
+    /// Basic test of alternatives.
     #[test]
     fn text_to_emojis_01() {
         assert_eq!(text_to_emojis("a").unwrap(), ":regional_indicator_a:");
@@ -363,5 +369,29 @@ mod tests {
             ":regional_indicator_a: :a: :four:"
         );
         assert_eq!(text_to_emojis("aaaa"), None);
+    }
+
+    /// Test all the characters, does not test the alternatives.
+    #[test]
+    fn text_to_emojis_02() {
+        let mut char_to_emoji = TEXT_TO_EMOJIS_CHAR_TO_EMOJI
+            .iter()
+            .map(|(key, value)| (*key, value))
+            .collect::<Vec<_>>();
+
+        char_to_emoji.sort_by_key(|(key, _)| *key);
+
+        let char_string = char_to_emoji
+            .iter()
+            .flat_map(|(ch, emojis)| vec![*ch; emojis.len()])
+            .collect::<String>();
+        let emoji_string = char_to_emoji
+            .iter()
+            .flat_map(|(_, emojis)| &***emojis)
+            .map(|emoji| emoji.as_str())
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        assert_eq!(text_to_emojis(&char_string).unwrap(), emoji_string);
     }
 }
