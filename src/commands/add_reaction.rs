@@ -135,8 +135,9 @@ impl Command for AddReaction {
             .await
         {
             tracing::error!(
-                "couldn't respond error message to slash command due to `{}`",
-                err
+                "couldn't respond error message to slash command for user `{}` due to `{}`",
+                command_interaction.user.tag(),
+                err,
             );
         }
 
@@ -159,9 +160,10 @@ impl Command for AddReaction {
                         {
                             Ok(_) => {
                                 tracing::info!(
-                                    "added reaction `{}` to `{}`",
+                                    "added reaction `{}` to `{}` for user `{}`",
                                     reaction_type,
-                                    message_id
+                                    message_id,
+                                    command_interaction.user.tag(),
                                 );
 
                                 if let Some(guild_id) = command_interaction.guild_id {
@@ -194,7 +196,9 @@ impl Command for AddReaction {
         if let Some(add_reaction_err) = &add_reaction_err {
             tracing::error!(
                 target: "add_reaction",
-                "{}", add_reaction_err
+                "user `{}` - {}",
+                command_interaction.user.tag(),
+                add_reaction_err
             );
 
             if let Err(err) = command_interaction
@@ -204,8 +208,10 @@ impl Command for AddReaction {
                 .await
             {
                 tracing::error!(
-                    "couldn't edit interaction response message to slash command due to `{}`",
-                    err
+                    "couldn't edit interaction response message to \
+                     slash command for user `{}` due to `{}`",
+                    command_interaction.user.tag(),
+                    err,
                 );
             }
         }
