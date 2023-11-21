@@ -227,7 +227,7 @@ impl EventHandler for Handler {
 
     async fn reaction_add(&self, context: Context, reaction: Reaction) {
         if let (Some(guild_id), Some(user_id)) = (&reaction.guild_id, reaction.user_id) {
-            let guilds_to_bot_added_emojis = self.bot_context.bot_added_emojis.read().await;
+            let guilds_to_bot_added_emojis = self.bot_context.bot_added_reactions.read().await;
             if let Some(bot_added_emojis) = guilds_to_bot_added_emojis.get(guild_id) {
                 if let Some(delete_index) = bot_added_emojis.iter().enumerate().find_map(
                     |(bot_added_emoji_index, bot_added_emoji)| {
@@ -240,7 +240,7 @@ impl EventHandler for Handler {
                 ) {
                     drop(guilds_to_bot_added_emojis);
                     let mut guilds_to_bot_added_emojis =
-                        self.bot_context.bot_added_emojis.write().await;
+                        self.bot_context.bot_added_reactions.write().await;
                     let bot_added_emoji = guilds_to_bot_added_emojis
                         .get_mut(guild_id)
                         .unwrap()

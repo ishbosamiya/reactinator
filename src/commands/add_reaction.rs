@@ -13,7 +13,7 @@ use serenity::{
     },
 };
 
-use crate::{context::BotAddedEmoji, BotContext};
+use crate::{context::BotAddedReactions, BotContext};
 
 use super::Command;
 
@@ -168,12 +168,12 @@ impl Command for AddReaction {
 
                                 if let Some(guild_id) = command_interaction.guild_id {
                                     bot_context
-                                        .bot_added_emojis
+                                        .bot_added_reactions
                                         .write()
                                         .await
                                         .entry(guild_id)
                                         .or_insert_with(Vec::new)
-                                        .push(BotAddedEmoji {
+                                        .push(BotAddedReactions {
                                             channel_id: command_interaction.channel_id,
                                             message_id,
                                             user_id: command_interaction.user.id,

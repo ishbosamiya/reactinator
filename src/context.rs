@@ -15,9 +15,9 @@ pub struct BotContext {
     /// [`GuildId`] to emoji name to [`Emoji`] mapping.
     pub guild_emojis: Arc<RwLock<HashMap<GuildId, HashMap<String, Emoji>>>>,
 
-    /// Bot added emojis. Mapping from [`GuildId`] to the
-    /// [`BotAddedEmoji`]s for that guild.
-    pub bot_added_emojis: Arc<RwLock<HashMap<GuildId, Vec<BotAddedEmoji>>>>,
+    /// Bot added reactions. Mapping from [`GuildId`] to the
+    /// [`BotAddedReactions`] for that guild.
+    pub bot_added_reactions: Arc<RwLock<HashMap<GuildId, Vec<BotAddedReactions>>>>,
 }
 
 impl BotContext {
@@ -26,7 +26,7 @@ impl BotContext {
         Self {
             last_message_ids: Arc::new(RwLock::new(HashMap::new())),
             guild_emojis: Arc::new(RwLock::new(HashMap::new())),
-            bot_added_emojis: Arc::new(RwLock::new(HashMap::new())),
+            bot_added_reactions: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 }
@@ -37,9 +37,9 @@ impl Default for BotContext {
     }
 }
 
-/// Bot added emoji.
+/// Bot added reactions.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct BotAddedEmoji {
+pub struct BotAddedReactions {
     /// [`ChannelId`].
     pub channel_id: ChannelId,
     /// [`MessageId`].
