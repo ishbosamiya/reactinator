@@ -17,7 +17,8 @@ pub struct BotContext {
 
     /// Bot added reactions. Mapping from [`GuildId`] to the
     /// [`BotAddedReactions`] for that guild.
-    pub bot_added_reactions: Arc<RwLock<HashMap<GuildId, Vec<BotAddedReactions>>>>,
+    pub bot_added_reactions:
+        Arc<RwLock<HashMap<GuildId, Vec<Arc<std::sync::RwLock<BotAddedReactions>>>>>>,
 }
 
 impl BotContext {

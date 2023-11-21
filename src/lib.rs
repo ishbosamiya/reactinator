@@ -233,6 +233,7 @@ impl EventHandler for Handler {
                     .iter()
                     .enumerate()
                     .find_map(|(bot_added_reactions_index, bot_added_reactions)| {
+                        let bot_added_reactions = bot_added_reactions.read().unwrap();
                         (bot_added_reactions.channel_id == reaction.channel_id
                             && bot_added_reactions.message_id == reaction.message_id
                             && bot_added_reactions.user_id == user_id
@@ -250,7 +251,11 @@ impl EventHandler for Handler {
                         .unwrap();
                     match reaction.message(&context.http).await {
                         Ok(message) => {
-                            bot_added_reactions.reaction_types.remove(&reaction.emoji);
+                            bot_added_reactions
+                                .write()
+                                .unwrap()
+                                .reaction_types
+                                .remove(&reaction.emoji);
                             match message
                                 .delete_reaction(
                                     &context.http,
@@ -284,7 +289,16 @@ impl EventHandler for Handler {
                         }
                     }
 
-                    if bot_added_reactions.reaction_types.is_empty() {
+                    if bot_added_reactions
+                        .read()
+                        .unwrap()
+                        .reaction_types
+                        .is_empty()
+                    {
+                        tracing::info!(
+                            "removing bot added reactions at index `{}` since it is now empty",
+                            bot_added_reactions_index
+                        );
                         guilds_to_bot_added_reactions
                             .get_mut(guild_id)
                             .unwrap()

@@ -1,6 +1,6 @@
 //! Add a reaction to the given message or previous message.
 
-use std::collections::HashSet;
+use std::{collections::HashSet, sync::Arc};
 
 use serenity::{
     async_trait,
@@ -190,13 +190,13 @@ impl Command for AddReaction {
                         .await
                         .entry(guild_id)
                         .or_insert_with(Vec::new)
-                        .push(BotAddedReactions {
+                        .push(Arc::new(std::sync::RwLock::new(BotAddedReactions {
                             channel_id: command_interaction.channel_id,
                             message_id,
                             user_id: command_interaction.user.id,
                             reaction_types,
                             creation_time: std::time::Instant::now(),
-                        });
+                        })));
                 }
             }
         }

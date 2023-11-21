@@ -219,13 +219,13 @@ impl Command for TextToReactions {
                         .await
                         .entry(guild_id)
                         .or_insert_with(Vec::new)
-                        .push(BotAddedReactions {
+                        .push(Arc::new(std::sync::RwLock::new(BotAddedReactions {
                             channel_id: command_interaction.channel_id,
                             message_id,
                             user_id: command_interaction.user.id,
                             reaction_types,
                             creation_time: std::time::Instant::now(),
-                        });
+                        })));
                 }
             }
         }
