@@ -206,6 +206,7 @@ impl Command for TextToReactions {
                                             message_id,
                                             user_id: command_interaction.user.id,
                                             reaction_type,
+                                            creation_time: std::time::Instant::now(),
                                         });
                                 }
                             }

@@ -48,4 +48,7 @@ pub struct BotAddedEmoji {
     pub user_id: UserId,
     /// [`ReactionType`].
     pub reaction_type: ReactionType,
+
+    /// Creation time of the emoji.
+    pub creation_time: std::time::Instant,
 }

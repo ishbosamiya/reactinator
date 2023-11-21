@@ -178,6 +178,7 @@ impl Command for AddReaction {
                                             message_id,
                                             user_id: command_interaction.user.id,
                                             reaction_type,
+                                            creation_time: std::time::Instant::now(),
                                         });
                                 }
                             }
