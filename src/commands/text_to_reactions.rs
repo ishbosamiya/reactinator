@@ -1,7 +1,10 @@
 //! Add the given text as list of reactions to the given message or
 //! previous message.
 
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use lazy_static::lazy_static;
 use serenity::{
@@ -170,6 +173,7 @@ impl Command for TextToReactions {
         }
 
         if let (Some(emoji_text), Some(message_id)) = (emoji_text, message_id) {
+            let mut reaction_types = HashSet::new();
             for emoji in emoji_text
                 .split_whitespace()
                 .map(|emoji| emoji.trim())
@@ -194,21 +198,7 @@ impl Command for TextToReactions {
                                     command_interaction.user.tag(),
                                 );
 
-                                if let Some(guild_id) = command_interaction.guild_id {
-                                    bot_context
-                                        .bot_added_reactions
-                                        .write()
-                                        .await
-                                        .entry(guild_id)
-                                        .or_insert_with(Vec::new)
-                                        .push(BotAddedReactions {
-                                            channel_id: command_interaction.channel_id,
-                                            message_id,
-                                            user_id: command_interaction.user.id,
-                                            reaction_type,
-                                            creation_time: std::time::Instant::now(),
-                                        });
-                                }
+                                reaction_types.insert(reaction_type);
                             }
                             Err(err) => {
                                 text_to_reactions_err = Some(Error::CouldNotReactToMessage(err));
@@ -219,6 +209,22 @@ impl Command for TextToReactions {
                         text_to_reactions_err = Some(Error::InvalidEmoji(err));
                     }
                 }
+            }
+
+            if let Some(guild_id) = command_interaction.guild_id {
+                bot_context
+                    .bot_added_reactions
+                    .write()
+                    .await
+                    .entry(guild_id)
+                    .or_insert_with(Vec::new)
+                    .push(BotAddedReactions {
+                        channel_id: command_interaction.channel_id,
+                        message_id,
+                        user_id: command_interaction.user.id,
+                        reaction_types,
+                        creation_time: std::time::Instant::now(),
+                    });
             }
         }
 

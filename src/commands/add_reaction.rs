@@ -1,5 +1,7 @@
 //! Add a reaction to the given message or previous message.
 
+use std::collections::HashSet;
+
 use serenity::{
     async_trait,
     builder::CreateApplicationCommand,
@@ -142,6 +144,7 @@ impl Command for AddReaction {
         }
 
         if let (Some(emojis), Some(message_id)) = (emojis, message_id) {
+            let mut reaction_types = HashSet::new();
             for emoji in emojis
                 .split_whitespace()
                 .map(|emoji| emoji.trim())
@@ -166,21 +169,7 @@ impl Command for AddReaction {
                                     command_interaction.user.tag(),
                                 );
 
-                                if let Some(guild_id) = command_interaction.guild_id {
-                                    bot_context
-                                        .bot_added_reactions
-                                        .write()
-                                        .await
-                                        .entry(guild_id)
-                                        .or_insert_with(Vec::new)
-                                        .push(BotAddedReactions {
-                                            channel_id: command_interaction.channel_id,
-                                            message_id,
-                                            user_id: command_interaction.user.id,
-                                            reaction_type,
-                                            creation_time: std::time::Instant::now(),
-                                        });
-                                }
+                                reaction_types.insert(reaction_type);
                             }
                             Err(err) => {
                                 add_reaction_err = Some(Error::CouldNotReactToMessage(err));
@@ -191,6 +180,22 @@ impl Command for AddReaction {
                         add_reaction_err = Some(Error::InvalidEmoji(err));
                     }
                 }
+            }
+
+            if let Some(guild_id) = command_interaction.guild_id {
+                bot_context
+                    .bot_added_reactions
+                    .write()
+                    .await
+                    .entry(guild_id)
+                    .or_insert_with(Vec::new)
+                    .push(BotAddedReactions {
+                        channel_id: command_interaction.channel_id,
+                        message_id,
+                        user_id: command_interaction.user.id,
+                        reaction_types,
+                        creation_time: std::time::Instant::now(),
+                    });
             }
         }
 

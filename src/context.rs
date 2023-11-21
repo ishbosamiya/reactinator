@@ -1,6 +1,6 @@
 //! Bot's context.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use serenity::model::prelude::*;
@@ -38,7 +38,7 @@ impl Default for BotContext {
 }
 
 /// Bot added reactions.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BotAddedReactions {
     /// [`ChannelId`].
     pub channel_id: ChannelId,
@@ -46,8 +46,8 @@ pub struct BotAddedReactions {
     pub message_id: MessageId,
     /// [`UserId`].
     pub user_id: UserId,
-    /// [`ReactionType`].
-    pub reaction_type: ReactionType,
+    /// Set of [`ReactionType`]s for this particular message.
+    pub reaction_types: HashSet<ReactionType>,
 
     /// Creation time of the emoji.
     pub creation_time: std::time::Instant,
