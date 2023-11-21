@@ -60,6 +60,13 @@ impl Command for ListCustomEmojis {
         match emojis {
             Some(emojis) => {
                 for emojis in emojis {
+                    tracing::info!(
+                        target: "list_custom_emojis",
+                        "creating interaction response for `{}` with `{}`",
+                        command_interaction.user.tag(),
+                        emojis
+                    );
+
                     if let Err(err) = command_interaction
                         .create_interaction_response(&context.http, |response| {
                             response
@@ -71,24 +78,40 @@ impl Command for ListCustomEmojis {
                         .await
                     {
                         tracing::error!(
-                            "couldn't respond to `list_custom_emojis` due to `{}`",
+                            target: "list_custom_emojis",
+                            "couldn't respond to `list_custom_emojis` for user `{}` due to `{}`",
+                            command_interaction.user.tag(),
                             err
                         );
                     }
                 }
             }
             None => {
+                let response_content = "No custom emojis";
+
+                tracing::info!(
+                    target: "list_custom_emojis",
+                    "creating interaction response for `{}` with `{}`",
+                    command_interaction.user.tag(),
+                    response_content,
+                );
+
                 if let Err(err) = command_interaction
                     .create_interaction_response(&context.http, |response| {
                         response
                             .kind(InteractionResponseType::ChannelMessageWithSource)
                             .interaction_response_data(|message| {
-                                message.content("No custom emojis").ephemeral(true)
+                                message.content(response_content).ephemeral(true)
                             })
                     })
                     .await
                 {
-                    tracing::error!("couldn't respond to `list_custom_emojis` due to `{}`", err);
+                    tracing::error!(
+                        target: "list_custom_emojis",
+                        "couldn't respond to `list_custom_emojis` for user `{}` due to `{}`",
+                        command_interaction.user.tag(),
+                        err
+                    );
                 }
             }
         }
