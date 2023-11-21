@@ -85,7 +85,12 @@ impl Command for TextToReactions {
         let emoji_text = match text {
             Some(text) => match text_to_emojis(&text) {
                 Some(emoji_text) => {
-                    tracing::info!("converted `{}` to `{}`", text, emoji_text);
+                    tracing::info!(
+                        "converted `{}` to `{}` for user `{}`",
+                        text,
+                        emoji_text,
+                        command_interaction.user.tag()
+                    );
                     Some(emoji_text)
                 }
                 None => {
@@ -158,7 +163,8 @@ impl Command for TextToReactions {
             .await
         {
             tracing::error!(
-                "couldn't respond error message to slash command due to `{}`",
+                "couldn't respond error message to slash command for user `{}` due to `{}`",
+                command_interaction.user.tag(),
                 err
             );
         }
@@ -182,9 +188,10 @@ impl Command for TextToReactions {
                         {
                             Ok(_) => {
                                 tracing::info!(
-                                    "added reaction `{}` to `{}`",
+                                    "added reaction `{}` to `{}` for user `{}`",
                                     reaction_type,
-                                    message_id
+                                    message_id,
+                                    command_interaction.user.tag(),
                                 );
 
                                 if let Some(guild_id) = command_interaction.guild_id {
@@ -217,7 +224,9 @@ impl Command for TextToReactions {
         if let Some(text_to_reactions_err) = &text_to_reactions_err {
             tracing::error!(
                 target: "text_to_reactions",
-                "{}", text_to_reactions_err
+                "user `{}` - {}",
+                command_interaction.user.tag(),
+                text_to_reactions_err,
             );
 
             if let Err(err) = command_interaction
@@ -227,8 +236,10 @@ impl Command for TextToReactions {
                 .await
             {
                 tracing::error!(
-                    "couldn't edit interaction response message to slash command due to `{}`",
-                    err
+                    "couldn't edit interaction response message to \
+                     slash command for user `{}` due to `{}`",
+                    command_interaction.user.tag(),
+                    err,
                 );
             }
         }
