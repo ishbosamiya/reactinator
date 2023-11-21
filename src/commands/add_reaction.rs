@@ -182,20 +182,22 @@ impl Command for AddReaction {
                 }
             }
 
-            if let Some(guild_id) = command_interaction.guild_id {
-                bot_context
-                    .bot_added_reactions
-                    .write()
-                    .await
-                    .entry(guild_id)
-                    .or_insert_with(Vec::new)
-                    .push(BotAddedReactions {
-                        channel_id: command_interaction.channel_id,
-                        message_id,
-                        user_id: command_interaction.user.id,
-                        reaction_types,
-                        creation_time: std::time::Instant::now(),
-                    });
+            if !reaction_types.is_empty() {
+                if let Some(guild_id) = command_interaction.guild_id {
+                    bot_context
+                        .bot_added_reactions
+                        .write()
+                        .await
+                        .entry(guild_id)
+                        .or_insert_with(Vec::new)
+                        .push(BotAddedReactions {
+                            channel_id: command_interaction.channel_id,
+                            message_id,
+                            user_id: command_interaction.user.id,
+                            reaction_types,
+                            creation_time: std::time::Instant::now(),
+                        });
+                }
             }
         }
 
