@@ -1,7 +1,5 @@
 //! Add a reaction to the given message or previous message.
 
-use std::{collections::HashSet, sync::Arc};
-
 use serenity::{
     async_trait,
     builder::CreateApplicationCommand,
@@ -10,14 +8,14 @@ use serenity::{
         application::interaction::InteractionResponseType,
         prelude::{
             application_command::ApplicationCommandInteraction, command::CommandOptionType,
-            MessageId, ReactionConversionError, ReactionType,
+            MessageId, ReactionConversionError,
         },
     },
 };
 
-use crate::{context::BotAddedReactions, BotContext};
+use crate::BotContext;
 
-use super::Command;
+use super::{react_to_message_with, Command, ReactToMessageWithError};
 
 /// `add_reaction` command.
 pub struct AddReaction;
@@ -144,60 +142,16 @@ impl Command for AddReaction {
         }
 
         if let (Some(emojis), Some(message_id)) = (emojis, message_id) {
-            let mut reaction_types = HashSet::new();
-            for emoji in emojis
-                .split_whitespace()
-                .map(|emoji| emoji.trim())
-                .filter(|emoji| !emoji.is_empty())
+            if let Err(err) = react_to_message_with(
+                message_id,
+                &emojis,
+                command_interaction,
+                context,
+                bot_context,
+            )
+            .await
             {
-                match ReactionType::try_from(emoji) {
-                    Ok(reaction_type) => {
-                        match context
-                            .http
-                            .create_reaction(
-                                command_interaction.channel_id.0,
-                                message_id.0,
-                                &reaction_type,
-                            )
-                            .await
-                        {
-                            Ok(_) => {
-                                tracing::info!(
-                                    "added reaction `{}` to `{}` for user `{}`",
-                                    reaction_type,
-                                    message_id,
-                                    command_interaction.user.tag(),
-                                );
-
-                                reaction_types.insert(reaction_type);
-                            }
-                            Err(err) => {
-                                add_reaction_err = Some(Error::CouldNotReactToMessage(err));
-                            }
-                        }
-                    }
-                    Err(err) => {
-                        add_reaction_err = Some(Error::InvalidEmoji(err));
-                    }
-                }
-            }
-
-            if !reaction_types.is_empty() {
-                if let Some(guild_id) = command_interaction.guild_id {
-                    bot_context
-                        .bot_added_reactions
-                        .write()
-                        .await
-                        .entry(guild_id)
-                        .or_insert_with(Vec::new)
-                        .push(Arc::new(std::sync::RwLock::new(BotAddedReactions {
-                            channel_id: command_interaction.channel_id,
-                            message_id,
-                            user_id: command_interaction.user.id,
-                            reaction_types,
-                            creation_time: std::time::Instant::now(),
-                        })));
-                }
+                add_reaction_err = Some(err.into());
             }
         }
 
@@ -236,6 +190,7 @@ pub enum Error {
     InvalidMessageId(String),
     CouldNotReactToMessage(serenity::Error),
     NoLastMessageAvailableAndNoMessageIdProvided,
+    ReactToMessageWith(ReactToMessageWithError),
 }
 
 impl std::fmt::Display for Error {
@@ -257,8 +212,15 @@ impl std::fmt::Display for Error {
             Error::NoLastMessageAvailableAndNoMessageIdProvided => {
                 write!(f, "no last message available and no message id provided")
             }
+            Error::ReactToMessageWith(err) => write!(f, "{}", err),
         }
     }
 }
 
 impl std::error::Error for Error {}
+
+impl From<ReactToMessageWithError> for Error {
+    fn from(err: ReactToMessageWithError) -> Self {
+        Self::ReactToMessageWith(err)
+    }
+}
