@@ -29,6 +29,8 @@ pub async fn react_to_message_with(
     context: &Context,
     bot_context: &BotContext,
 ) -> Result<(), ReactToMessageWithError> {
+    const REACTION_TIMEOUT_TIME_IN_SECONDS: u64 = 10;
+
     let mut react_to_message_with_err = None;
 
     let mut reaction_types = HashSet::new();
@@ -92,8 +94,6 @@ pub async fn react_to_message_with(
             let user_tag = command_interaction.user.tag();
             let command_interaction_user = command_interaction.user.clone();
             tokio::spawn(async move {
-                const REACTION_TIMEOUT_TIME_IN_SECONDS: u64 = 5;
-
                 tokio::time::sleep(std::time::Duration::from_secs(
                     REACTION_TIMEOUT_TIME_IN_SECONDS,
                 ))
