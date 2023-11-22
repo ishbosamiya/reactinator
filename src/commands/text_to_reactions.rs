@@ -283,16 +283,17 @@ impl Command for TextToReactions {
                                 }
                             }
                             match command_interaction_user
-                                .direct_message(&context_http, |message| {
-                                    message.content(format!(
-                                        "Removed reactions `{}` since you \
-                                         did **not** react within {} seconds.",
+                                .direct_message(&context_http, |create_message| {
+                                    create_message.content(format!(
+                                        "Removed reactions `{}` for message `{}` since \
+                                         you did **not** react within {} seconds.",
                                         bot_added_reactions
                                             .reaction_types
                                             .iter()
                                             .map(|reaction| reaction.to_string())
                                             .collect::<Vec<_>>()
                                             .join(", "),
+                                        bot_added_reactions.message_id,
                                         REACTION_TIMEOUT_TIME_IN_SECONDS,
                                     ))
                                 })
@@ -300,7 +301,7 @@ impl Command for TextToReactions {
                             {
                                 Ok(_) => {
                                     tracing::info!(
-                                        "informed `{}` about deleting the\
+                                        "informed `{}` about deleting the \
                                          reactions from message `{}` in channel `{}`",
                                         user_tag,
                                         bot_added_reactions.message_id,
