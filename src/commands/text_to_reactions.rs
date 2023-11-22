@@ -231,8 +231,14 @@ impl Command for TextToReactions {
                     let context_http = context.http.clone();
                     let bot_id = context.cache.current_user_id();
                     let user_tag = command_interaction.user.tag();
+                    let command_interaction_user = command_interaction.user.clone();
                     tokio::spawn(async move {
-                        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                        const REACTION_TIMEOUT_TIME_IN_SECONDS: u64 = 5;
+
+                        tokio::time::sleep(std::time::Duration::from_secs(
+                            REACTION_TIMEOUT_TIME_IN_SECONDS,
+                        ))
+                        .await;
 
                         let bot_added_reactions = { bot_added_reactions.write().unwrap().clone() };
                         if !bot_added_reactions.reaction_types.is_empty() {
@@ -241,13 +247,13 @@ impl Command for TextToReactions {
                                  user `{}` didn't interact with them",
                                 user_tag,
                             );
-                            for reaction_type in bot_added_reactions.reaction_types {
+                            for reaction_type in &bot_added_reactions.reaction_types {
                                 match context_http
                                     .delete_reaction(
                                         bot_added_reactions.channel_id.0,
                                         bot_added_reactions.message_id.0,
                                         Some(bot_id.0),
-                                        &reaction_type,
+                                        reaction_type,
                                     )
                                     .await
                                 {
@@ -274,6 +280,43 @@ impl Command for TextToReactions {
                                             err,
                                         );
                                     }
+                                }
+                            }
+                            match command_interaction_user
+                                .direct_message(&context_http, |message| {
+                                    message.content(format!(
+                                        "Removed reactions `{}` since you \
+                                         did **not** react within {} seconds.",
+                                        bot_added_reactions
+                                            .reaction_types
+                                            .iter()
+                                            .map(|reaction| reaction.to_string())
+                                            .collect::<Vec<_>>()
+                                            .join(", "),
+                                        REACTION_TIMEOUT_TIME_IN_SECONDS,
+                                    ))
+                                })
+                                .await
+                            {
+                                Ok(_) => {
+                                    tracing::info!(
+                                        "informed `{}` about deleting the\
+                                         reactions from message `{}` in channel `{}`",
+                                        user_tag,
+                                        bot_added_reactions.message_id,
+                                        bot_added_reactions.channel_id
+                                    );
+                                }
+                                Err(err) => {
+                                    tracing::error!(
+                                        "couldn't inform `{}` about deleting \
+                                         the reactions from message `{}` \
+                                         in channel `{}` due to `{}`",
+                                        user_tag,
+                                        bot_added_reactions.message_id,
+                                        bot_added_reactions.channel_id,
+                                        err
+                                    );
                                 }
                             }
                         }
