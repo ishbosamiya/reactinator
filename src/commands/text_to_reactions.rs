@@ -213,19 +213,73 @@ impl Command for TextToReactions {
 
             if !reaction_types.is_empty() {
                 if let Some(guild_id) = command_interaction.guild_id {
+                    let bot_added_reactions = Arc::new(std::sync::RwLock::new(BotAddedReactions {
+                        channel_id: command_interaction.channel_id,
+                        message_id,
+                        user_id: command_interaction.user.id,
+                        reaction_types,
+                        creation_time: std::time::Instant::now(),
+                    }));
                     bot_context
                         .bot_added_reactions
                         .write()
                         .await
                         .entry(guild_id)
                         .or_insert_with(Vec::new)
-                        .push(Arc::new(std::sync::RwLock::new(BotAddedReactions {
-                            channel_id: command_interaction.channel_id,
-                            message_id,
-                            user_id: command_interaction.user.id,
-                            reaction_types,
-                            creation_time: std::time::Instant::now(),
-                        })));
+                        .push(bot_added_reactions.clone());
+
+                    let context_http = context.http.clone();
+                    let bot_id = context.cache.current_user_id();
+                    let user_tag = command_interaction.user.tag();
+                    tokio::spawn(async move {
+                        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+
+                        let bot_added_reactions = { bot_added_reactions.write().unwrap().clone() };
+                        if !bot_added_reactions.reaction_types.is_empty() {
+                            tracing::info!(
+                                "attempting to remove reactions because \
+                                 user `{}` didn't interact with them",
+                                user_tag,
+                            );
+                            for reaction_type in bot_added_reactions.reaction_types {
+                                match context_http
+                                    .delete_reaction(
+                                        bot_added_reactions.channel_id.0,
+                                        bot_added_reactions.message_id.0,
+                                        Some(bot_id.0),
+                                        &reaction_type,
+                                    )
+                                    .await
+                                {
+                                    Ok(_) => {
+                                        tracing::info!(
+                                            "deleted `{}` reaction from message\
+                                             `{}` in channel `{}` succesfully \
+                                             because user `{}` didn't react",
+                                            reaction_type,
+                                            bot_added_reactions.message_id,
+                                            bot_added_reactions.channel_id,
+                                            user_tag,
+                                        );
+                                    }
+                                    Err(err) => {
+                                        tracing::error!(
+                                            "couldn't delete `{}` reaction from \
+                                             message `{}` in channel `{}` because \
+                                             user `{}` didn't react due to `{}",
+                                            reaction_type,
+                                            bot_added_reactions.message_id,
+                                            bot_added_reactions.channel_id,
+                                            user_tag,
+                                            err,
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    })
+                    .await
+                    .unwrap();
                 }
             }
         }
