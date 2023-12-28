@@ -1,8 +1,8 @@
 //! `ping` command.
 
 use serenity::{
-    async_trait, builder::CreateApplicationCommand,
-    model::application::interaction::InteractionResponseType,
+    async_trait,
+    builder::{CreateCommand, CreateInteractionResponse},
 };
 
 use crate::BotContext;
@@ -14,23 +14,19 @@ pub struct Ping;
 
 #[async_trait]
 impl Command for Ping {
-    fn register(command: &mut CreateApplicationCommand, _bot_context: &BotContext) -> Self {
+    fn register(command: &mut CreateCommand, _bot_context: &BotContext) -> Self {
         command.name("ping").description("Ping command");
         Self
     }
 
     async fn interaction(
         &mut self,
-        command_interaction: &serenity::model::prelude::application_command::ApplicationCommandInteraction,
+        command_interaction: &serenity::model::application::CommandInteraction,
         context: &serenity::prelude::Context,
         _bot_context: &BotContext,
     ) {
         if let Err(err) = command_interaction
-            .create_interaction_response(&context.http, |response| {
-                response
-                    .kind(InteractionResponseType::ChannelMessageWithSource)
-                    .interaction_response_data(|message| message.content("pong"))
-            })
+            .create_response(&context.http, CreateInteractionResponse::Pong)
             .await
         {
             tracing::error!("couldn't respond to slash command due to `{}`", err);

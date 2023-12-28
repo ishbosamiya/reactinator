@@ -2,11 +2,8 @@
 
 use serenity::{
     async_trait,
-    builder::CreateApplicationCommand,
-    model::{
-        application::interaction::application_command::ApplicationCommandInteraction,
-        prelude::InteractionResponseType,
-    },
+    builder::{CreateCommand, CreateInteractionResponse},
+    model::application::CommandInteraction,
 };
 
 use crate::BotContext;
@@ -18,7 +15,7 @@ pub struct ListCustomEmojis;
 
 #[async_trait]
 impl Command for ListCustomEmojis {
-    fn register(command: &mut CreateApplicationCommand, _bot_context: &BotContext) -> Self {
+    fn register(command: &mut CreateCommand, _bot_context: &BotContext) -> Self {
         command
             .name("list_custom_emojis")
             .description("List the custom emojis of the server.");
@@ -27,7 +24,7 @@ impl Command for ListCustomEmojis {
 
     async fn interaction(
         &mut self,
-        command_interaction: &ApplicationCommandInteraction,
+        command_interaction: &CommandInteraction,
         context: &serenity::prelude::Context,
         bot_context: &BotContext,
     ) {
@@ -68,9 +65,9 @@ impl Command for ListCustomEmojis {
                     );
 
                     if let Err(err) = command_interaction
-                        .create_interaction_response(&context.http, |response| {
+                        .create_response(&context.http, |response| {
                             response
-                                .kind(InteractionResponseType::ChannelMessageWithSource)
+                                .kind(CreateInteractionResponse::Message)
                                 .interaction_response_data(|message| {
                                     message.content(emojis).ephemeral(true)
                                 })
@@ -97,9 +94,9 @@ impl Command for ListCustomEmojis {
                 );
 
                 if let Err(err) = command_interaction
-                    .create_interaction_response(&context.http, |response| {
+                    .create_response(&context.http, |response| {
                         response
-                            .kind(InteractionResponseType::ChannelMessageWithSource)
+                            .kind(CreateInteractionResponse::Message)
                             .interaction_response_data(|message| {
                                 message.content(response_content).ephemeral(true)
                             })

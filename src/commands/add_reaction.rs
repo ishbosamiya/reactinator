@@ -2,14 +2,11 @@
 
 use serenity::{
     async_trait,
-    builder::CreateApplicationCommand,
+    builder::{CreateCommand, CreateCommandOption, CreateInteractionResponse},
     json::Value,
     model::{
-        application::interaction::InteractionResponseType,
-        prelude::{
-            application_command::ApplicationCommandInteraction, command::CommandOptionType,
-            MessageId, ReactionConversionError,
-        },
+        application::{CommandInteraction, CommandOptionType},
+        prelude::{MessageId, ReactionConversionError},
     },
 };
 
@@ -28,18 +25,18 @@ const OPTION_MESSAGE_ID: &str = "message_id";
 
 #[async_trait]
 impl Command for AddReaction {
-    fn register(command: &mut CreateApplicationCommand, _bot_context: &BotContext) -> Self {
+    fn register(command: &mut CreateCommand, _bot_context: &BotContext) -> Self {
         command
             .name("add_reaction")
             .description("Add reaction(s) to the given message or last message on the channel.")
-            .create_option(|command_option| {
+            .add_option(|command_option: CreateCommandOption| {
                 command_option
                     .required(true)
                     .kind(CommandOptionType::String)
                     .name(OPTION_EMOJI)
                     .description("Emoji to react with. Can use multiple space separated emojis.")
             })
-            .create_option(|command_option| {
+            .add_option(|command_option| {
                 command_option
                     .kind(CommandOptionType::String)
                     .name(OPTION_MESSAGE_ID)
@@ -50,7 +47,7 @@ impl Command for AddReaction {
 
     async fn interaction(
         &mut self,
-        command_interaction: &ApplicationCommandInteraction,
+        command_interaction: &CommandInteraction,
         context: &serenity::prelude::Context,
         bot_context: &BotContext,
     ) {
@@ -114,9 +111,9 @@ impl Command for AddReaction {
         };
 
         if let Err(err) = command_interaction
-            .create_interaction_response(&context.http, |response| {
+            .create_response(&context.http, |response| {
                 response
-                    .kind(InteractionResponseType::ChannelMessageWithSource)
+                    .kind(CreateInteractionResponse::Message)
                     .interaction_response_data(|message| {
                         message
                             .content(if let Some(err) = add_reaction_err.take() {
@@ -164,7 +161,7 @@ impl Command for AddReaction {
             );
 
             if let Err(err) = command_interaction
-                .edit_original_interaction_response(&context.http, |response| {
+                .edit_response(&context.http, |response| {
                     response.content(format!("error: {}", add_reaction_err))
                 })
                 .await

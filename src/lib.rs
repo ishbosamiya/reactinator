@@ -10,11 +10,7 @@ use std::sync::Arc;
 
 use commands::Command;
 use serenity::{
-    async_trait,
-    builder::CreateApplicationCommand,
-    model::{
-        application::interaction::application_command::ApplicationCommandInteraction, prelude::*,
-    },
+    async_trait, builder::CreateCommand, model::application::CommandInteraction, model::prelude::*,
     prelude::*,
 };
 
@@ -47,7 +43,7 @@ impl GuildCommands {
     }
 
     /// Insert a new command.
-    pub fn insert(&mut self, command_creation: &CreateApplicationCommand, command: impl Command) {
+    pub fn insert(&mut self, command_creation: &CreateCommand, command: impl Command) {
         self.0.insert(
             command_creation
                 .0
@@ -63,7 +59,7 @@ impl GuildCommands {
     /// Interaction with the commands.
     pub async fn interaction(
         &mut self,
-        command_interaction: &ApplicationCommandInteraction,
+        command_interaction: &CommandInteraction,
         context: &Context,
         bot_context: &BotContext,
     ) {
@@ -99,7 +95,7 @@ impl EventHandler for Handler {
     }
 
     async fn interaction_create(&self, context: Context, interaction: Interaction) {
-        if let Interaction::ApplicationCommand(command_interaction) = interaction {
+        if let Interaction::Command(command_interaction) = interaction {
             tracing::info!("command interaction: {:#?}", command_interaction);
 
             match &command_interaction.guild_id {
@@ -129,16 +125,16 @@ impl EventHandler for Handler {
         for guild_id in ctx.cache.guilds().into_iter() {
             let mut guild_commands = self.guild_commands.write().await;
             let commands = guild_id
-                .set_application_commands(&ctx.http, |commands| {
+                .set_commands(&ctx.http, |commands| {
                     let guild_commands = guild_commands
                         .entry(guild_id)
                         .or_insert_with(GuildCommands::default);
 
                     fn register_command<'a, C: Command>(
-                        create_application_command: &'a mut CreateApplicationCommand,
+                        create_application_command: &'a mut CreateCommand,
                         guild_commands: &mut GuildCommands,
                         bot_context: &BotContext,
-                    ) -> &'a mut CreateApplicationCommand {
+                    ) -> &'a mut CreateCommand {
                         let command = C::register(create_application_command, bot_context);
                         guild_commands.insert(&create_application_command, command);
                         create_application_command
