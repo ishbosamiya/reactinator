@@ -6,14 +6,11 @@ use std::{collections::HashMap, sync::Arc};
 use lazy_static::lazy_static;
 use serenity::{
     async_trait,
-    builder::CreateApplicationCommand,
+    builder::{CreateCommand, CreateInteractionResponse},
     json::Value,
     model::{
-        application::interaction::InteractionResponseType,
-        prelude::{
-            application_command::ApplicationCommandInteraction, command::CommandOptionType,
-            MessageId,
-        },
+        application::{CommandInteraction, CommandOptionType},
+        prelude::MessageId,
     },
 };
 
@@ -32,7 +29,7 @@ const OPTION_MESSAGE_ID: &str = "message_id";
 
 #[async_trait]
 impl Command for TextToReactions {
-    fn register(command: &mut CreateApplicationCommand, _bot_context: &BotContext) -> Self {
+    fn register(command: &mut CreateCommand, _bot_context: &BotContext) -> Self {
         command
             .name("text_to_reactions")
             .description(
@@ -57,7 +54,7 @@ impl Command for TextToReactions {
 
     async fn interaction(
         &mut self,
-        command_interaction: &ApplicationCommandInteraction,
+        command_interaction: &CommandInteraction,
         context: &serenity::prelude::Context,
         bot_context: &BotContext,
     ) {
@@ -142,9 +139,9 @@ impl Command for TextToReactions {
         };
 
         if let Err(err) = command_interaction
-            .create_interaction_response(&context.http, |response| {
+            .create_response(&context.http, |response| {
                 response
-                    .kind(InteractionResponseType::ChannelMessageWithSource)
+                    .kind(CreateInteractionResponse::Message)
                     .interaction_response_data(|message| {
                         message
                             .content(if let Some(err) = text_to_reactions_err.take() {
@@ -192,7 +189,7 @@ impl Command for TextToReactions {
             );
 
             if let Err(err) = command_interaction
-                .edit_original_interaction_response(&context.http, |response| {
+                .edit_response(&context.http, |response| {
                     response.content(format!("error: {}", text_to_reactions_err))
                 })
                 .await
@@ -254,50 +251,50 @@ lazy_static! {
     /// [`text_to_emojis()`]: `emoji_name` to [`char`] emoji.
     pub static ref TEXT_TO_EMOJIS_EMOJI_NAME_TO_EMOJI: HashMap<&'static str, &'static str> = {
         [
-            (":regional_indicator_a:", "🇦"),
-            (":regional_indicator_b:", "🇧"),
-            (":regional_indicator_c:", "🇨"),
-            (":regional_indicator_d:", "🇩"),
-            (":regional_indicator_e:", "🇪"),
-            (":regional_indicator_f:", "🇫"),
-            (":regional_indicator_g:", "🇬"),
-            (":regional_indicator_h:", "🇭"),
-            (":regional_indicator_i:", "🇮"),
-            (":regional_indicator_j:", "🇯"),
-            (":regional_indicator_k:", "🇰"),
-            (":regional_indicator_l:", "🇱"),
-            (":regional_indicator_m:", "🇲"),
-            (":regional_indicator_n:", "🇳"),
-            (":regional_indicator_o:", "🇴"),
-            (":regional_indicator_p:", "🇵"),
-            (":regional_indicator_q:", "🇶"),
-            (":regional_indicator_r:", "🇷"),
-            (":regional_indicator_s:", "🇸"),
-            (":regional_indicator_t:", "🇹"),
-            (":regional_indicator_u:", "🇺"),
-            (":regional_indicator_v:", "🇻"),
-            (":regional_indicator_w:", "🇼"),
-            (":regional_indicator_x:", "🇽"),
-            (":regional_indicator_y:", "🇾"),
-            (":regional_indicator_z:", "🇿"),
-            (":zero:", "0️⃣"),
-            (":one:", "1️⃣"),
-            (":two:", "2️⃣"),
-            (":three:", "3️⃣"),
-            (":four:", "4️⃣"),
-            (":five:", "5️⃣"),
-            (":six:", "6️⃣"),
-            (":seven:", "7️⃣"),
-            (":eight:", "8️⃣"),
-            (":nine:", "9️⃣"),
-            (":keycap_ten:", "🔟"),
-            (":information_source:", "ℹ️"),
-            (":a:", "🅰️"),
-            (":b:", "🅱️"),
-            (":o2:", "🅾️"),
-            (":o:", "⭕"),
-            (":m:", "Ⓜ️"),
-            (":parking:", "🅿️"),
+            (":regional_indicator_a:", " "),
+            (":regional_indicator_b:", " "),
+            (":regional_indicator_c:", " "),
+            (":regional_indicator_d:", " "),
+            (":regional_indicator_e:", " "),
+            (":regional_indicator_f:", " "),
+            (":regional_indicator_g:", " "),
+            (":regional_indicator_h:", " "),
+            (":regional_indicator_i:", " "),
+            (":regional_indicator_j:", " "),
+            (":regional_indicator_k:", " "),
+            (":regional_indicator_l:", " "),
+            (":regional_indicator_m:", " "),
+            (":regional_indicator_n:", " "),
+            (":regional_indicator_o:", " "),
+            (":regional_indicator_p:", " "),
+            (":regional_indicator_q:", " "),
+            (":regional_indicator_r:", " "),
+            (":regional_indicator_s:", " "),
+            (":regional_indicator_t:", " "),
+            (":regional_indicator_u:", " "),
+            (":regional_indicator_v:", " "),
+            (":regional_indicator_w:", " "),
+            (":regional_indicator_x:", " "),
+            (":regional_indicator_y:", " "),
+            (":regional_indicator_z:", " "),
+            (":zero:", "0  "),
+            (":one:", "1  "),
+            (":two:", "2  "),
+            (":three:", "3  "),
+            (":four:", "4  "),
+            (":five:", "5  "),
+            (":six:", "6  "),
+            (":seven:", "7  "),
+            (":eight:", "8  "),
+            (":nine:", "9  "),
+            (":keycap_ten:", " "),
+            (":information_source:", "  "),
+            (":a:", "  "),
+            (":b:", "  "),
+            (":o2:", "  "),
+            (":o:", " "),
+            (":m:", "  "),
+            (":parking:", "  "),
         ].into_iter().collect()
     };
 }
@@ -409,9 +406,9 @@ mod tests {
     /// Basic test of alternatives.
     #[test]
     fn text_to_emojis_01() {
-        assert_eq!(text_to_emojis("a").unwrap(), "🇦");
-        assert_eq!(text_to_emojis("aa").unwrap(), "🇦 🅰️");
-        assert_eq!(text_to_emojis("aaa").unwrap(), "🇦 🅰️ 4️⃣");
+        assert_eq!(text_to_emojis("a").unwrap(), " ");
+        assert_eq!(text_to_emojis("aa").unwrap(), "    ");
+        assert_eq!(text_to_emojis("aaa").unwrap(), "     4  ");
         assert_eq!(text_to_emojis("aaaa"), None);
     }
 
